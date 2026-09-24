@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0"
+  />
+
+  <meta
+    name="description"
+    content="File Structure Builder - Create project folder structures and download them as ZIP archives directly in your browser."
+  />
+
+  <meta
+    name="robots"
+    content="index, follow"
+  />
+
+  <title>File Structure Builder</title>
+
+  <link
+    rel="icon"
+    type="image/svg+xml"
+    href="./assets/favicon.svg"
+  />
+
+  <!--
+    Local application stylesheet.
+    No external CSS framework is required.
+  -->
+  <link rel="stylesheet" href="./css/style.css" />
+
+  <!-- Local JSZip library -->
+  <script src="./lib/jszip.min.js" defer></script>
+
+  <!-- Application JavaScript -->
+  <script src="./js/app.js" defer></script>
+</head>
+
+<body>
+
+  <!-- =========================
+       HEADER
+  ========================== -->
+
+  <header class="site-header">
+    <div class="container header-inner">
+
+      <div class="brand">
+
+        <div class="brand-icon">
+          📁
+        </div>
+
+        <div>
+          <h1>File Structure Builder</h1>
+
+          <p>
+            Instant Text to ZIP Structure Generator
+          </p>
+        </div>
+
+      </div>
+
+      <span class="version-badge">
+        v2.0
+      </span>
+
+    </div>
+  </header>
+
+
+  <!-- =========================
+       MAIN
+  ========================== -->
+
+  <main class="container main-content">
+
+    <section class="workspace">
+
+      <!-- =========================
+           INPUT PANEL
+      ========================== -->
+
+      <section class="panel">
+
+        <div class="panel-header">
+
+          <div class="panel-title">
+
+            <span>📄</span>
+
+            <span>
+              Text Structure Input
+            </span>
+
+            <span
+              id="lineCountBadge"
+              class="badge"
+            >
+              0 lines
+            </span>
+
+          </div>
+
+
+          <div class="panel-actions">
+
+            <!-- Presets -->
+
+            <div class="preset-wrapper">
+
+              <button
+                id="presetToggleBtn"
+                class="button button-secondary"
+                type="button"
+              >
+                📦 Presets ▼
+              </button>
+
+
+              <div
+                id="presetMenu"
+                class="preset-menu hidden"
+              >
+
+                <div class="preset-title">
+                  Preset Templates
+                </div>
+
+
+                <button
+                  class="preset-option-btn"
+                  data-preset="react-vite"
+                  type="button"
+                >
+                  <strong>
+                    React + Vite
+                  </strong>
+
+                  <small>
+                    React components and Vite structure
+                  </small>
+                </button>
+
+
+                <button
+                  class="preset-option-btn"
+                  data-preset="express-api"
+                  type="button"
+                >
+                  <strong>
+                    Express REST API
+                  </strong>
+
+                  <small>
+                    Controllers, routes and middleware
+                  </small>
+                </button>
+
+
+                <button
+                  class="preset-option-btn"
+                  data-preset="nextjs-app"
+                  type="button"
+                >
+                  <strong>
+                    Next.js App
+                  </strong>
+
+                  <small>
+                    App router project structure
+                  </small>
+                </button>
+
+
+                <button
+                  class="preset-option-btn"
+                  data-preset="python-pkg"
+                  type="button"
+                >
+                  <strong>
+                    Python Package
+                  </strong>
+
+                  <small>
+                    Python package and CLI structure
+                  </small>
+                </button>
+
+              </div>
+
+            </div>
+
+
+            <button
+              id="copyInputBtn"
+              class="button button-secondary"
+              type="button"
+            >
+              <span id="copyBtnLabel">
+                Copy
+              </span>
+            </button>
+
+
+            <button
+              id="clearInputBtn"
+              class="button button-danger"
+              type="button"
+            >
+              Clear
+            </button>
+
+          </div>
+
+        </div>
+
+
+        <!-- Text input -->
+
+        <div class="editor-container">
+
+          <textarea
+            id="rawTextInput"
+            class="structure-input"
+            placeholder="Paste or type your ASCII tree, indented folders, or path list here..."
+            spellcheck="false"
+            autocomplete="off"
+          ></textarea>
+
+        </div>
+
+
+        <div class="panel-footer">
+
+          💡 Supports ASCII trees
+          <code>├──</code>,
+          indented structures,
+          and path lists.
+
+        </div>
+
+      </section>
+
+
+      <!-- =========================
+           PREVIEW PANEL
+      ========================== -->
+
+      <section class="panel">
+
+        <div class="panel-header">
+
+          <div class="panel-title">
+
+            <span>👁️</span>
+
+            <span>
+              Live Parsed Tree
+            </span>
+
+          </div>
+
+
+          <div class="stats">
+
+            <span
+              id="folderCountPill"
+              class="stat folder-stat"
+            >
+              📁 0 folders
+            </span>
+
+            <span
+              id="fileCountPill"
+              class="stat file-stat"
+            >
+              📄 0 files
+            </span>
+
+          </div>
+
+        </div>
+
+
+        <!-- Search -->
+
+        <div class="search-container">
+
+          <input
+            type="search"
+            id="searchInput"
+            placeholder="Search tree nodes..."
+            autocomplete="off"
+          />
+
+        </div>
+
+
+        <!-- Tree -->
+
+        <div
+          id="treeContainer"
+          class="tree-container"
+        >
+        </div>
+
+
+        <div class="panel-footer">
+
+          Click a file to inspect or edit its boilerplate content.
+
+        </div>
+
+      </section>
+
+    </section>
+
+
+    <!-- =========================
+         EXPORT PANEL
+    ========================== -->
+
+    <section class="export-panel">
+
+      <div>
+
+        <h2>
+          📦 Export ZIP Archive
+        </h2>
+
+        <p>
+          Generate your project structure as a downloadable ZIP archive.
+        </p>
+
+        <p class="privacy-note">
+          🔒 Processing happens locally in your browser.
+        </p>
+
+      </div>
+
+
+      <button
+        id="downloadZipBtn"
+        class="download-button"
+        type="button"
+      >
+        Download ZIP
+      </button>
+
+    </section>
+
+
+    <!-- =========================
+         STATUS TOAST
+    ========================== -->
+
+    <div
+      id="statusToast"
+      class="toast hidden"
+      role="status"
+      aria-live="polite"
+    >
+
+      <span id="statusToastContent"></span>
+
+      <button
+        id="closeToastBtn"
+        type="button"
+        aria-label="Close notification"
+      >
+        ✕
+      </button>
+
+    </div>
+
+  </main>
+
+
+  <!-- =========================
+       FILE INSPECTOR MODAL
+  ========================== -->
+
+  <div
+    id="fileInspectorModal"
+    class="modal hidden"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="modalFileName"
+  >
+
+    <div class="modal-content">
+
+      <div class="modal-header">
+
+        <div>
+
+          <h2 id="modalFileName">
+            filename.js
+          </h2>
+
+          <p id="modalFilePath">
+            project/src/filename.js
+          </p>
+
+        </div>
+
+
+        <button
+          id="closeInspectorBtn"
+          class="modal-close"
+          type="button"
+          aria-label="Close editor"
+        >
+          ✕
+        </button>
+
+      </div>
+
+
+      <div class="modal-body">
+
+        <textarea
+          id="modalFileContent"
+          class="file-editor"
+          spellcheck="false"
+        ></textarea>
+
+      </div>
+
+
+      <div class="modal-footer">
+
+        <button
+          id="resetModalBoilerplateBtn"
+          class="button button-secondary"
+          type="button"
+        >
+          Reset Boilerplate
+        </button>
+
+
+        <button
+          id="saveInspectorBtn"
+          class="button button-primary"
+          type="button"
+        >
+          Save Changes
+        </button>
+
+      </div>
+
+    </div>
+
+  </div>
+
+
+  <!-- =========================
+       FOOTER
+  ========================== -->
+
+  <footer class="site-footer">
+
+    <div class="container footer-inner">
+
+      <div>
+
+        <strong>
+          📁 File Structure Builder
+        </strong>
+
+        <p>
+          Browser-based project structure generator.
+        </p>
+
+      </div>
+
+
+      <div class="footer-links">
+
+        <a href="./">
+          Home
+        </a>
+
+        <a
+          href="https://github.com/"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          GitHub
+        </a>
+
+      </div>
+
+
+      <div class="copyright">
+
+        <span>
+          Developed by Pranav's Technologies
+        </span>
+
+        <small>
+          © 2026 Pranav's Technologies
+        </small>
+
+      </div>
+
+    </div>
+
+  </footer>
+
+</body>
+</html>
