@@ -1,861 +1,1439 @@
 "use strict";
 
-
-let projectTree = [];
-let currentFile = null;
-
-
-/* =========================================================
-   DOM
-========================================================= */
-
-const input = document.getElementById("rawTextInput");
-const treeContainer = document.getElementById("treeContainer");
-
-const downloadBtn = document.getElementById("downloadZipBtn");
-
-const lineCountBadge = document.getElementById("lineCountBadge");
-const folderCountPill = document.getElementById("folderCountPill");
-const fileCountPill = document.getElementById("fileCountPill");
-
-const searchInput = document.getElementById("searchInput");
-
-const statusToast = document.getElementById("statusToast");
-const statusToastContent = document.getElementById("statusToastContent");
-
-const libraryStatus = document.getElementById("libraryStatus");
-
-const presetToggleBtn = document.getElementById("presetToggleBtn");
-const presetMenu = document.getElementById("presetMenu");
-
-const copyInputBtn = document.getElementById("copyInputBtn");
-const copyBtnLabel = document.getElementById("copyBtnLabel");
-
-const clearInputBtn = document.getElementById("clearInputBtn");
-
-const closeToastBtn = document.getElementById("closeToastBtn");
-
-const modal = document.getElementById("fileInspectorModal");
-const modalFileName = document.getElementById("modalFileName");
-const modalFilePath = document.getElementById("modalFilePath");
-const modalFileContent = document.getElementById("modalFileContent");
-
-const closeInspectorBtn = document.getElementById("closeInspectorBtn");
-const saveInspectorBtn = document.getElementById("saveInspectorBtn");
-const resetModalBoilerplateBtn =
-  document.getElementById("resetModalBoilerplateBtn");
-
-
-/* =========================================================
-   JSZIP CHECK
-========================================================= */
-
-function isJSZipAvailable() {
-  return (
-    typeof window.JSZip === "function" ||
-    typeof window.JSZip === "object"
-  );
-}
-
-
-function updateLibraryStatus() {
-
-  if (isJSZipAvailable()) {
-
-    libraryStatus.textContent = "ZIP library ready";
-
-    libraryStatus.className =
-      "text-xs font-mono px-3 py-1 rounded-full border " +
-      "text-emerald-400 bg-emerald-950/40 border-emerald-500/30";
-
-    downloadBtn.disabled = false;
-
-    downloadBtn.className =
-      "w-full sm:w-auto px-6 py-3 text-sm font-semibold rounded-xl " +
-      "bg-gradient-to-r from-indigo-600 to-violet-600 " +
-      "hover:from-indigo-500 hover:to-violet-500 " +
-      "text-white shadow-lg cursor-pointer active:scale-95";
-
-  } else {
-
-    libraryStatus.textContent = "ZIP library unavailable";
-
-    libraryStatus.className =
-      "text-xs font-mono px-3 py-1 rounded-full border " +
-      "text-rose-400 bg-rose-950/40 border-rose-500/30";
-
-    downloadBtn.disabled = true;
-
-    downloadBtn.className =
-      "w-full sm:w-auto px-6 py-3 text-sm font-semibold rounded-xl " +
-      "bg-slate-700 text-slate-400 cursor-not-allowed";
-
-    showStatus(
-      "ZIP library is unavailable. Please refresh the page.",
-      "error"
-    );
-  }
-}
-
-
 /*
- * Small delay allows slower mobile browsers to finish
- * loading the local JSZip file.
- */
-function waitForJSZip() {
+=========================================================
+FILE STRUCTURE BUILDER
+Production Client-Side Application
+=========================================================
 
-  let attempts = 0;
+Privacy model:
 
-  const timer = setInterval(() => {
+- No backend
+- No database
+- No authentication
+- No intentional upload of user input
+- File structures are processed in the browser
+- ZIP generation happens locally
 
-    attempts++;
+Important:
+Clearing JavaScript references does not guarantee
+cryptographic erasure from browser memory.
+=========================================================
+*/
 
-    if (isJSZipAvailable()) {
 
-      clearInterval(timer);
-      updateLibraryStatus();
-      return;
-    }
+/* ========================================================
+   APPLICATION STATE
+======================================================== */
 
-    if (attempts >= 50) {
+const state = {
 
-      clearInterval(timer);
-      updateLibraryStatus();
-    }
+  currentParsedTree: null,
 
-  }, 100);
+  nodeIndexMap: new Map(),
+
+  nodeCounter: 0,
+
+  totalFolders: 0,
+
+  totalFiles: 0,
+
+  activeInspectorNode: null
+
+};
+
+
+/* ========================================================
+   TEMPLATES
+======================================================== */
+
+const TEMPLATES = {
+
+  "react-vite": `my-react-app/
+├── public/
+│   ├── favicon.ico
+│   └── vite.svg
+├── src/
+│   ├── assets/
+│   │   └── logo.svg
+│   ├── components/
+│   │   ├── Navbar.jsx
+│   │   ├── Footer.jsx
+│   │   └── Card.jsx
+│   ├── pages/
+│   │   ├── Home.jsx
+│   │   └── About.jsx
+│   ├── App.jsx
+│   ├── App.css
+│   ├── main.jsx
+│   └── index.css
+├── .gitignore
+├── index.html
+├── package.json
+├── vite.config.js
+└── README.md`,
+
+
+
+  "express-api": `my-express-api/
+├── src/
+│   ├── config/
+│   │   ├── db.js
+│   │   └── env.js
+│   ├── controllers/
+│   │   ├── authController.js
+│   │   └── userController.js
+│   ├── middleware/
+│   │   ├── auth.js
+│   │   └── errorHandler.js
+│   ├── models/
+│   │   └── User.js
+│   ├── routes/
+│   │   ├── authRoutes.js
+│   │   └── userRoutes.js
+│   └── app.js
+├── .env.example
+├── .gitignore
+├── Dockerfile
+├── package.json
+└── README.md`,
+
+
+
+  "nextjs-app": `my-next-project/
+├── app/
+│   ├── api/
+│   │   └── users/
+│   │       └── route.js
+│   ├── dashboard/
+│   │   ├── page.jsx
+│   │   └── layout.jsx
+│   ├── globals.css
+│   ├── layout.jsx
+│   └── page.jsx
+├── components/
+│   ├── button.jsx
+│   └── modal.jsx
+├── public/
+├── .env.example
+├── next.config.js
+├── package.json
+└── README.md`,
+
+
+
+  "python-pkg": `my_python_pkg/
+├── src/
+│   └── my_pkg/
+│       ├── __init__.py
+│       ├── core.py
+│       └── cli.py
+├── tests/
+│   └── test_core.py
+├── pyproject.toml
+├── README.md
+└── requirements.txt`
+
+};
+
+
+/* ========================================================
+   DOM HELPERS
+======================================================== */
+
+function $(id) {
+
+  return document.getElementById(id);
+
 }
 
 
-/* =========================================================
-   STATUS
-========================================================= */
+/* ========================================================
+   INPUT SANITIZATION
+======================================================== */
 
-function showStatus(message, type = "success") {
+function sanitizeName(name) {
 
-  statusToast.classList.remove("hidden");
-
-  statusToastContent.textContent = message;
-
-  if (type === "error") {
-
-    statusToast.className =
-      "mt-4 p-3 rounded-xl text-xs bg-rose-950/80 " +
-      "border border-rose-900 text-rose-200";
-
-  } else {
-
-    statusToast.className =
-      "mt-4 p-3 rounded-xl text-xs bg-emerald-950/80 " +
-      "border border-emerald-900 text-emerald-200";
+  if (!name) {
+    return "";
   }
+
+  let clean = String(name).trim();
+
+  // Remove comments
+  clean = clean.replace(
+    /\s*(?:#|\/\/).*$/,
+    ""
+  );
+
+  // Remove leading/trailing separators
+  clean = clean.replace(
+    /^[\/\\]+|[\/\\]+$/g,
+    ""
+  );
+
+  // Replace characters invalid on Windows
+  clean = clean.replace(
+    /[:*?"<>|]/g,
+    "_"
+  );
+
+  // Prevent dangerous path traversal
+  clean = clean.replace(
+    /\.\.(?=\/|\\|$)/g,
+    "_"
+  );
+
+  clean = clean
+    .trim()
+    .replace(/\.+$/, "");
+
+  return clean;
+
 }
 
 
-closeToastBtn.addEventListener("click", () => {
-  statusToast.classList.add("hidden");
-});
+/* ========================================================
+   BOILERPLATE GENERATOR
+======================================================== */
 
+function getBoilerplateContent(filename) {
 
-/* =========================================================
-   PARSER
-========================================================= */
-
-function parseStructure(text) {
-
-  const lines = text
-    .replace(/\r/g, "")
-    .split("\n")
-    .filter(line => line.trim() !== "");
-
-  const root = [];
-
-  const stack = [
-    {
-      level: -1,
-      children: root
-    }
-  ];
-
-  lines.forEach((rawLine) => {
-
-    let line = rawLine.trimEnd();
-
-    /*
-     * Remove tree drawing characters.
-     */
-    line = line
-      .replace(/^[│┃| ]+/g, "")
-      .replace(/^[├└┌┬┤┘┐└─—]+\s*/g, "")
-      .trim();
-
-    if (!line) return;
-
-
-    /*
-     * Calculate indentation.
-     */
-    const leadingSpaces =
-      rawLine.search(/\S|$/);
-
-    let level = Math.floor(leadingSpaces / 4);
-
-
-    /*
-     * ASCII tree characters usually indicate one level.
-     */
-    if (
-      rawLine.includes("├──") ||
-      rawLine.includes("└──") ||
-      rawLine.includes("├─") ||
-      rawLine.includes("└─")
-    ) {
-      level = Math.max(0, level);
-    }
-
-
-    /*
-     * Determine folder/file.
-     */
-    const looksLikeFolder =
-      line.endsWith("/") ||
-      line.endsWith("\\") ||
-      /^[^./]+$/.test(line);
-
-
-    const name = line
-      .replace(/[\/\\]+$/, "")
-      .trim();
-
-
-    const isFile =
-      !looksLikeFolder ||
-      /\.[a-zA-Z0-9]{1,10}$/.test(name);
-
-
-    const node = {
-      name,
-      type: isFile ? "file" : "folder",
-      content: isFile ? getBoilerplate(name) : "",
-      children: []
-    };
-
-
-    while (
-      stack.length > 1 &&
-      stack[stack.length - 1].level >= level
-    ) {
-      stack.pop();
-    }
-
-
-    stack[stack.length - 1].children.push(node);
-
-
-    if (node.type === "folder") {
-
-      stack.push({
-        level,
-        children: node.children
-      });
-    }
-
-  });
-
-  return root;
-}
-
-
-/* =========================================================
-   BOILERPLATE
-========================================================= */
-
-function getBoilerplate(filename) {
+  if (!filename) {
+    return "";
+  }
 
   const lower = filename.toLowerCase();
 
-  if (lower === "index.html") {
 
-    return `<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="UTF-8">
-  <title>My Project</title>
-</head>
-<body>
-  <h1>Hello World</h1>
-</body>
-</html>`;
-  }
-
-
-  if (lower.endsWith(".html")) {
-
-    return `<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="UTF-8">
-  <title>${filename}</title>
-</head>
-<body>
-
-</body>
-</html>`;
-  }
-
-
-  if (lower.endsWith(".css")) {
-
-    return `/* ${filename} */
-
-body {
-  margin: 0;
-  font-family: sans-serif;
-}`;
-  }
-
-
-  if (lower.endsWith(".js")) {
-
-    return `// ${filename}
-
-console.log("Hello from ${filename}");`;
-  }
-
-
-  if (lower.endsWith(".json")) {
+  if (lower === "package.json") {
 
     return `{
-  "name": "my-project"
+  "name": "my-app",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "start": "node index.js",
+    "dev": "vite"
+  }
 }`;
-  }
 
-
-  if (lower.endsWith(".py")) {
-
-    return `# ${filename}
-
-def main():
-    print("Hello World")
-
-
-if __name__ == "__main__":
-    main()
-`;
-  }
-
-
-  if (lower === "readme.md") {
-
-    return `# My Project
-
-Project description goes here.
-`;
   }
 
 
   if (lower === ".gitignore") {
 
     return `node_modules/
-.env
 dist/
-build/
+.env
+.env.*
+!.env.example
+*.log
+.DS_Store
 `;
+
   }
 
 
-  return "";
+  if (lower === "dockerfile") {
+
+    return `FROM node:20-alpine
+
+WORKDIR /app
+
+COPY package*.json ./
+
+RUN npm install
+
+COPY . .
+
+EXPOSE 3000
+
+CMD ["npm", "start"]
+`;
+
+  }
+
+
+  if (lower === "readme.md") {
+
+    return `# Project Title
+
+Generated with File Structure Builder.
+
+This project structure was generated locally in your browser.
+`;
+
+  }
+
+
+  if (lower.endsWith(".html")) {
+
+    return `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>App</title>
+</head>
+<body>
+
+    <h1>Hello World</h1>
+
+</body>
+</html>
+`;
+
+  }
+
+
+  if (lower.endsWith(".css")) {
+
+    return `/* Custom Styles */
+
+body {
+  margin: 0;
+  background-color: #0f172a;
+  color: #f8fafc;
+  font-family: sans-serif;
+}
+`;
+
+  }
+
+
+  if (
+    lower.endsWith(".jsx") ||
+    lower.endsWith(".tsx")
+  ) {
+
+    const baseName =
+      filename.split(".")[0] || "Component";
+
+    const componentName =
+      baseName.charAt(0).toUpperCase() +
+      baseName.slice(1);
+
+    return `import React from "react";
+
+export default function ${componentName}() {
+  return (
+    <div>
+      <h2>${componentName} Component</h2>
+    </div>
+  );
+}
+`;
+
+  }
+
+
+  if (
+    lower.endsWith(".js") ||
+    lower.endsWith(".ts")
+  ) {
+
+    return `/**
+ * ${filename}
+ */
+
+export function main() {
+  console.log("Running ${filename}");
+}
+
+main();
+`;
+
+  }
+
+
+  if (lower.endsWith(".py")) {
+
+    return `"""
+${filename}
+"""
+
+def main():
+    print("Running ${filename}")
+
+
+if __name__ == "__main__":
+    main()
+`;
+
+  }
+
+
+  if (lower.endsWith(".json")) {
+
+    return `{
+  "status": "ok"
+}
+`;
+
+  }
+
+
+  return `/* ${filename} */
+`;
+
 }
 
 
-/* =========================================================
-   COUNTS
-========================================================= */
+/* ========================================================
+   NODE CREATION
+======================================================== */
 
-function countNodes(nodes) {
+function createSafeNode(
+  name,
+  type,
+  path
+) {
 
-  let folders = 0;
-  let files = 0;
+  state.nodeCounter++;
 
+  const safeId =
+    `node_${state.nodeCounter}`;
 
-  function walk(list) {
+  const safeName =
+    sanitizeName(name);
 
-    list.forEach(node => {
+  const node = {
 
-      if (node.type === "folder") {
+    id: safeId,
 
-        folders++;
-        walk(node.children);
+    name: safeName,
 
-      } else {
+    type,
 
-        files++;
-      }
+    path,
 
-    });
-  }
+    children:
+      type === "folder"
+        ? []
+        : undefined
 
-
-  walk(nodes);
-
-  return {
-    folders,
-    files
   };
-}
 
-
-/* =========================================================
-   RENDER TREE
-========================================================= */
-
-function renderTree(nodes, container = treeContainer, depth = 0) {
-
-  container.innerHTML = "";
-
-  if (!nodes.length) {
-
-    container.innerHTML =
-      `<div class="text-slate-500 text-sm text-center py-10">
-        Enter a project structure to see the preview.
-      </div>`;
-
-    return;
-  }
-
-
-  function createNodes(list, parent, currentDepth) {
-
-    list.forEach(node => {
-
-      const row = document.createElement("div");
-
-      row.className =
-        "flex items-center gap-2 px-3 py-2 rounded-lg " +
-        "hover:bg-slate-800/80 cursor-pointer text-sm";
-
-
-      row.style.paddingLeft =
-        `${12 + currentDepth * 20}px`;
-
-
-      const icon =
-        node.type === "folder"
-          ? "📁"
-          : getFileIcon(node.name);
-
-
-      const name = document.createElement("span");
-
-      name.textContent = node.name;
-
-      name.className =
-        node.type === "folder"
-          ? "text-amber-300"
-          : "text-slate-300 font-mono text-xs";
-
-
-      row.innerHTML = `
-        <span>${icon}</span>
-      `;
-
-      row.appendChild(name);
-
-
-      if (node.type === "file") {
-
-        row.addEventListener("click", () => {
-
-          openFileEditor(node);
-
-        });
-
-      }
-
-
-      parent.appendChild(row);
-
-
-      if (node.children && node.children.length) {
-
-        createNodes(
-          node.children,
-          parent,
-          currentDepth + 1
-        );
-      }
-
-    });
-  }
-
-
-  createNodes(nodes, container, depth);
-}
-
-
-function getFileIcon(filename) {
-
-  const lower = filename.toLowerCase();
-
-  if (lower.endsWith(".js")) return "🟨";
-  if (lower.endsWith(".html")) return "🌐";
-  if (lower.endsWith(".css")) return "🎨";
-  if (lower.endsWith(".json")) return "⚙️";
-  if (lower.endsWith(".py")) return "🐍";
-  if (lower.endsWith(".md")) return "📝";
-
-  return "📄";
-}
-
-
-/* =========================================================
-   UPDATE UI
-========================================================= */
-
-function updateProject() {
-
-  projectTree = parseStructure(input.value);
-
-  const counts = countNodes(projectTree);
-
-
-  lineCountBadge.textContent =
-    `${input.value.split(/\r?\n/).length} lines`;
-
-
-  folderCountPill.textContent =
-    `📁 ${counts.folders} folders`;
-
-
-  fileCountPill.textContent =
-    `📄 ${counts.files} files`;
-
-
-  renderTree(projectTree);
-}
-
-
-input.addEventListener("input", updateProject);
-
-
-/* =========================================================
-   SEARCH
-========================================================= */
-
-searchInput.addEventListener("input", () => {
-
-  const query =
-    searchInput.value.trim().toLowerCase();
-
-
-  if (!query) {
-
-    renderTree(projectTree);
-    return;
-  }
-
-
-  const filtered = [];
-
-
-  function filterNodes(nodes) {
-
-    const result = [];
-
-    nodes.forEach(node => {
-
-      const matches =
-        node.name.toLowerCase().includes(query);
-
-
-      const childMatches =
-        node.children &&
-        filterNodes(node.children);
-
-
-      if (matches || childMatches.length) {
-
-        result.push({
-          ...node,
-          children: childMatches
-        });
-      }
-
-    });
-
-    return result;
-  }
-
-
-  const result = filterNodes(projectTree);
-
-  renderTree(result);
-});
-
-
-/* =========================================================
-   CLEAR
-========================================================= */
-
-clearInputBtn.addEventListener("click", () => {
-
-  input.value = "";
-
-  updateProject();
-
-});
-
-
-/* =========================================================
-   COPY
-========================================================= */
-
-copyInputBtn.addEventListener("click", async () => {
-
-  try {
-
-    await navigator.clipboard.writeText(input.value);
-
-    copyBtnLabel.textContent = "Copied!";
-
-    setTimeout(() => {
-
-      copyBtnLabel.textContent = "Copy";
-
-    }, 1500);
-
-  } catch {
-
-    showStatus(
-      "Unable to copy text.",
-      "error"
-    );
-  }
-
-});
-
-
-/* =========================================================
-   PRESETS
-========================================================= */
-
-const presets = {
-
-  "react-vite": `react-app/
-├── src/
-│   ├── components/
-│   │   └── App.jsx
-│   ├── main.jsx
-│   └── styles.css
-├── public/
-│   └── favicon.ico
-├── index.html
-├── package.json
-├── vite.config.js
-└── README.md`,
-
-  "express-api": `express-api/
-├── src/
-│   ├── controllers/
-│   │   └── userController.js
-│   ├── routes/
-│   │   └── userRoutes.js
-│   ├── middleware/
-│   │   └── auth.js
-│   └── server.js
-├── package.json
-└── README.md`,
-
-  "nextjs-app": `next-app/
-├── app/
-│   ├── layout.js
-│   ├── page.js
-│   └── globals.css
-├── public/
-├── package.json
-├── next.config.js
-└── README.md`,
-
-  "python-pkg": `python-project/
-├── src/
-│   └── mypackage/
-│       ├── __init__.py
-│       └── main.py
-├── tests/
-│   └── test_main.py
-├── pyproject.toml
-├── README.md
-└── .gitignore`
-};
-
-
-presetToggleBtn.addEventListener("click", () => {
-
-  presetMenu.classList.toggle("hidden");
-
-});
-
-
-document.querySelectorAll(".preset-option-btn")
-  .forEach(button => {
-
-    button.addEventListener("click", () => {
-
-      const preset =
-        button.dataset.preset;
-
-      input.value =
-        presets[preset] || "";
-
-      presetMenu.classList.add("hidden");
-
-      updateProject();
-
-    });
-
-  });
-
-
-/* =========================================================
-   FILE EDITOR
-========================================================= */
-
-function openFileEditor(node) {
-
-  currentFile = node;
-
-  modalFileName.textContent =
-    node.name;
-
-  modalFilePath.textContent =
-    node.name;
-
-  modalFileContent.value =
-    node.content || "";
-
-  modal.classList.remove("hidden");
-}
-
-
-closeInspectorBtn.addEventListener("click", () => {
-
-  modal.classList.add("hidden");
-
-});
-
-
-saveInspectorBtn.addEventListener("click", () => {
-
-  if (!currentFile) return;
-
-  currentFile.content =
-    modalFileContent.value;
-
-  modal.classList.add("hidden");
-
-  showStatus(
-    `${currentFile.name} saved.`,
-    "success"
+  state.nodeIndexMap.set(
+    safeId,
+    node
   );
 
-});
+  return node;
 
-
-resetModalBoilerplateBtn.addEventListener("click", () => {
-
-  if (!currentFile) return;
-
-  modalFileContent.value =
-    getBoilerplate(currentFile.name);
-
-});
-
-
-/* =========================================================
-   ZIP GENERATION
-========================================================= */
-
-function addNodesToZip(zip, nodes, currentPath = "") {
-
-  nodes.forEach(node => {
-
-    const safeName =
-      node.name.replace(/^[/\\]+/, "");
-
-    const path =
-      currentPath
-        ? `${currentPath}/${safeName}`
-        : safeName;
-
-
-    if (node.type === "folder") {
-
-      /*
-       * Explicitly create the folder.
-       */
-      zip.folder(path);
-
-      addNodesToZip(
-        zip,
-        node.children,
-        path
-      );
-
-    } else {
-
-      zip.file(
-        path,
-        node.content || ""
-      );
-    }
-
-  });
 }
 
 
-async function downloadZip() {
+/* ========================================================
+   PARSE INPUT
+======================================================== */
 
-  /*
-   * Final safety check.
-   */
-  if (!isJSZipAvailable()) {
+function parseFileStructure(rawText) {
 
-    showStatus(
-      "ZIP library is unavailable. Please refresh the page.",
-      "error"
+  state.nodeIndexMap.clear();
+
+  state.nodeCounter = 0;
+
+  if (
+    !rawText ||
+    !rawText.trim()
+  ) {
+
+    return null;
+
+  }
+
+
+  let cleaned =
+    rawText.trim();
+
+
+  // Remove markdown code fences
+  cleaned =
+    cleaned
+      .replace(
+        /^```[a-zA-Z]*\s*/gm,
+        ""
+      )
+      .replace(
+        /```\s*$/gm,
+        ""
+      );
+
+
+  const lines =
+    cleaned
+      .split(/\r?\n/)
+      .filter(
+        line => line.trim().length > 0
+      );
+
+
+  if (!lines.length) {
+    return null;
+  }
+
+
+  const isPathList =
+    lines.every(
+      line =>
+        line.trim().includes("/") &&
+        !/[├└│|]/.test(
+          line.trim()
+        )
     );
 
+
+  return isPathList
+    ? parsePathList(lines)
+    : parseAsciiTree(lines);
+
+}
+
+
+/* ========================================================
+   PATH LIST PARSER
+======================================================== */
+
+function parsePathList(lines) {
+
+  const rootNode =
+    createSafeNode(
+      "project",
+      "folder",
+      ""
+    );
+
+  const map =
+    new Map();
+
+
+  for (const line of lines) {
+
+    let clean =
+      line
+        .trim()
+        .replace(/\\/g, "/");
+
+
+    if (clean.startsWith("./")) {
+
+      clean =
+        clean.substring(2);
+
+    }
+
+
+    const parts =
+      clean
+        .split("/")
+        .filter(Boolean);
+
+
+    let currentPath = "";
+
+    let parent = rootNode;
+
+
+    parts.forEach(
+      (rawPart, index) => {
+
+        const isLast =
+          index === parts.length - 1;
+
+        const isFolder =
+          !isLast ||
+          rawPart.endsWith("/");
+
+
+        const part =
+          sanitizeName(
+            rawPart
+              .replace(/\/$/, "")
+          );
+
+
+        if (!part) {
+          return;
+        }
+
+
+        currentPath =
+          currentPath
+            ? `${currentPath}/${part}`
+            : part;
+
+
+        let node =
+          map.get(currentPath);
+
+
+        if (!node) {
+
+          node =
+            createSafeNode(
+              part,
+              isFolder
+                ? "folder"
+                : "file",
+              currentPath
+            );
+
+          map.set(
+            currentPath,
+            node
+          );
+
+
+          parent.children.push(
+            node
+          );
+
+        }
+
+
+        if (
+          node.type === "folder"
+        ) {
+
+          parent = node;
+
+        }
+
+      }
+    );
+
+  }
+
+
+  if (
+    rootNode.children.length === 1 &&
+    rootNode.children[0].type === "folder"
+  ) {
+
+    return rootNode.children[0];
+
+  }
+
+
+  return rootNode;
+
+}
+
+
+/* ========================================================
+   ASCII TREE PARSER
+======================================================== */
+
+function parseAsciiTree(lines) {
+
+  const parsed =
+    lines
+      .map(line => {
+
+        let clean =
+          line.replace(
+            /\s*(?:#|\/\/).*$/,
+            ""
+          );
+
+
+        const nameMatch =
+          clean.match(
+            /^[\s\t│|├└+─\-]+/
+          );
+
+
+        if (!nameMatch) {
+
+          const trimmed =
+            clean.trim();
+
+          if (!trimmed) {
+            return null;
+          }
+
+
+          const explicitFolder =
+            trimmed.endsWith("/");
+
+
+          return {
+
+            depth: 0,
+
+            name:
+              sanitizeName(
+                explicitFolder
+                  ? trimmed.slice(0, -1)
+                  : trimmed
+              ),
+
+            isExplicitFolder:
+              explicitFolder
+
+          };
+
+        }
+
+
+        const prefix =
+          nameMatch[0];
+
+
+        let name =
+          clean
+            .substring(prefix.length)
+            .trim();
+
+
+        if (!name) {
+          return null;
+        }
+
+
+        const isExplicitFolder =
+          name.endsWith("/");
+
+
+        if (isExplicitFolder) {
+
+          name =
+            name.slice(0, -1);
+
+        }
+
+
+        const branchIndex =
+          prefix.search(/[├└+]/);
+
+
+        let depth = 1;
+
+
+        if (branchIndex >= 0) {
+
+          const indent =
+            prefix
+              .substring(0, branchIndex)
+              .replace(/\t/g, "    ");
+
+
+          depth =
+            1 +
+            Math.floor(
+              indent.length / 4
+            );
+
+        } else {
+
+          const expanded =
+            prefix.replace(
+              /\t/g,
+              "    "
+            );
+
+
+          depth =
+            Math.max(
+              1,
+              Math.floor(
+                expanded.length / 2
+              )
+            );
+
+        }
+
+
+        return {
+
+          depth,
+
+          name:
+            sanitizeName(name),
+
+          isExplicitFolder
+
+        };
+
+      })
+      .filter(Boolean);
+
+
+  if (!parsed.length) {
+    return null;
+  }
+
+
+  const rootLine =
+    parsed[0];
+
+
+  const rootNode =
+    createSafeNode(
+      rootLine.name || "project",
+      "folder",
+      rootLine.name
+    );
+
+
+  const stack = [
+    {
+      node: rootNode,
+      depth: rootLine.depth
+    }
+  ];
+
+
+  for (
+    let i = 1;
+    i < parsed.length;
+    i++
+  ) {
+
+    const current =
+      parsed[i];
+
+    const next =
+      parsed[i + 1];
+
+
+    const nextIsDeeper =
+      next &&
+      next.depth > current.depth;
+
+
+    const hasExtension =
+      current.name.includes(".") &&
+      !current.name.startsWith(".");
+
+
+    const isFolder =
+      current.isExplicitFolder ||
+      nextIsDeeper ||
+      !hasExtension;
+
+
+    while (
+      stack.length > 1 &&
+      stack[
+        stack.length - 1
+      ].depth >= current.depth
+    ) {
+
+      stack.pop();
+
+    }
+
+
+    const parent =
+      stack[
+        stack.length - 1
+      ].node;
+
+
+    const itemPath =
+      parent.path
+        ? `${parent.path}/${current.name}`
+        : current.name;
+
+
+    const node =
+      createSafeNode(
+        current.name,
+        isFolder
+          ? "folder"
+          : "file",
+        itemPath
+      );
+
+
+    if (!parent.children) {
+      parent.children = [];
+    }
+
+
+    parent.children.push(node);
+
+
+    if (isFolder) {
+
+      stack.push({
+
+        node,
+
+        depth: current.depth
+
+      });
+
+    }
+
+  }
+
+
+  return rootNode;
+
+}
+
+
+/* ========================================================
+   UPDATE APPLICATION
+======================================================== */
+
+function handleInputUpdate() {
+
+  const raw =
+    $("rawTextInput").value;
+
+
+  const lines =
+    raw
+      ? raw.split("\n").length
+      : 0;
+
+
+  $("lineCountBadge").textContent =
+    `${lines} ${
+      lines === 1
+        ? "line"
+        : "lines"
+    }`;
+
+
+  state.currentParsedTree =
+    parseFileStructure(raw);
+
+
+  state.totalFolders = 0;
+
+  state.totalFiles = 0;
+
+
+  if (
+    state.currentParsedTree
+  ) {
+
+    prepareTree(
+      state.currentParsedTree
+    );
+
+  }
+
+
+  $("folderCountPill").textContent =
+    `📁 ${state.totalFolders} folders`;
+
+
+  $("fileCountPill").textContent =
+    `📄 ${state.totalFiles} files`;
+
+
+  renderTreeDOM();
+
+}
+
+
+/* ========================================================
+   PREPARE TREE
+======================================================== */
+
+function prepareTree(node) {
+
+  if (node.type === "folder") {
+
+    state.totalFolders++;
+
+
+    if (node.children) {
+
+      node.children.forEach(
+        prepareTree
+      );
+
+    }
+
+    return;
+
+  }
+
+
+  state.totalFiles++;
+
+
+  if (
+    node.content === undefined
+  ) {
+
+    node.content =
+      getBoilerplateContent(
+        node.name
+      );
+
+  }
+
+}
+
+
+/* ========================================================
+   ESCAPE HTML
+======================================================== */
+
+function escapeHTML(value) {
+
+  return String(value)
+    .replace(
+      /&/g,
+      "&amp;"
+    )
+    .replace(
+      /</g,
+      "&lt;"
+    )
+    .replace(
+      />/g,
+      "&gt;"
+    )
+    .replace(
+      /"/g,
+      "&quot;"
+    )
+    .replace(
+      /'/g,
+      "&#039;"
+    );
+
+}
+
+
+/* ========================================================
+   TREE SEARCH
+======================================================== */
+
+function nodeMatchesSearch(
+  node,
+  query
+) {
+
+  if (!query) {
+    return true;
+  }
+
+
+  if (
+    node.name
+      .toLowerCase()
+      .includes(query)
+  ) {
+
+    return true;
+
+  }
+
+
+  if (
+    node.type === "folder" &&
+    node.children
+  ) {
+
+    return node.children.some(
+      child =>
+        nodeMatchesSearch(
+          child,
+          query
+        )
+    );
+
+  }
+
+
+  return false;
+
+}
+
+
+/* ========================================================
+   TREE RENDER
+======================================================== */
+
+function renderTreeDOM() {
+
+  const container =
+    $("treeContainer");
+
+
+  const query =
+    $("searchInput")
+      .value
+      .toLowerCase()
+      .trim();
+
+
+  if (
+    !state.currentParsedTree
+  ) {
+
+    container.innerHTML = `
+
+      <div class="tree-empty">
+
+        <div style="font-size:40px">
+          📁
+        </div>
+
+        <p>
+          No folder structure parsed yet.
+        </p>
+
+      </div>
+
+    `;
+
+    return;
+
+  }
+
+
+  function buildNodeHTML(node) {
+
+    if (
+      !nodeMatchesSearch(
+        node,
+        query
+      )
+    ) {
+
+      return "";
+
+    }
+
+
+    const isFolder =
+      node.type === "folder";
+
+
+    const icon =
+      isFolder
+        ? "📁"
+        : "📄";
+
+
+    let childrenHTML = "";
+
+
+    if (
+      isFolder &&
+      node.children &&
+      node.children.length
+    ) {
+
+      childrenHTML = `
+
+        <div class="tree-children">
+
+          ${node.children
+            .map(buildNodeHTML)
+            .join("")}
+
+        </div>
+
+      `;
+
+    }
+
+
+    const safeName =
+      escapeHTML(node.name);
+
+
+    const safeId =
+      escapeHTML(node.id);
+
+
+    const itemCount =
+      node.children
+        ? node.children.length
+        : 0;
+
+
+    return `
+
+      <div class="tree-node">
+
+        <div
+          class="tree-row"
+          data-node-id="${safeId}"
+          data-node-type="${isFolder ? "folder" : "file"}"
+        >
+
+          <div
+            style="
+              display:flex;
+              align-items:center;
+              gap:8px;
+              min-width:0;
+            "
+          >
+
+            <span>
+              ${isFolder ? "▼" : ""}
+            </span>
+
+            <span>
+              ${icon}
+            </span>
+
+            <span
+              class="tree-name ${
+                isFolder
+                  ? "folder-name"
+                  : "file-name"
+              }"
+            >
+              ${safeName}
+            </span>
+
+          </div>
+
+
+          <div>
+
+            ${
+              isFolder
+
+                ? `
+                  <span
+                    style="
+                      color:#64748b;
+                      font-size:9px;
+                    "
+                  >
+                    ${itemCount} items
+                  </span>
+                `
+
+                : `
+                  <button
+                    class="inspect-btn"
+                    data-node-id="${safeId}"
+                    type="button"
+                  >
+                    Edit
+                  </button>
+                `
+            }
+
+          </div>
+
+        </div>
+
+
+        ${childrenHTML}
+
+      </div>
+
+    `;
+
+  }
+
+
+  container.innerHTML =
+    buildNodeHTML(
+      state.currentParsedTree
+    );
+
+}
+
+
+/* ========================================================
+   ZIP DOWNLOAD
+======================================================== */
+
+function triggerDownload(
+  blob,
+  filename
+) {
+
+  const url =
+    URL.createObjectURL(blob);
+
+
+  const link =
+    document.createElement("a");
+
+
+  link.href = url;
+
+  link.download = filename;
+
+  link.style.display = "none";
+
+
+  document.body.appendChild(
+    link
+  );
+
+
+  link.click();
+
+
+  setTimeout(() => {
+
+    link.remove();
+
+    URL.revokeObjectURL(url);
+
+  }, 1000);
+
+}
+
+
+/* ========================================================
+   ADD TREE TO ZIP
+======================================================== */
+
+function addNodeToZip(
+  node,
+  folderZip
+) {
+
+  const cleanName =
+    sanitizeName(node.name);
+
+
+  if (!cleanName) {
     return;
   }
 
 
-  if (!projectTree.length) {
+  if (
+    node.type === "folder"
+  ) {
 
-    showStatus(
-      "Please enter a project structure first.",
-      "error"
-    );
+    const subFolder =
+      folderZip.folder(
+        cleanName
+      );
+
+
+    if (
+      node.children
+    ) {
+
+      node.children.forEach(
+        child =>
+          addNodeToZip(
+            child,
+            subFolder
+          )
+      );
+
+    }
+
 
     return;
+
   }
 
+
+  folderZip.file(
+    cleanName,
+    node.content || ""
+  );
+
+}
+
+
+/* ========================================================
+   DOWNLOAD ZIP
+======================================================== */
+
+async function handleDownloadZip() {
 
   try {
 
-    downloadBtn.disabled = true;
+    if (
+      !state.currentParsedTree
+    ) {
 
-    downloadBtn.textContent =
-      "Creating ZIP...";
+      const raw =
+        $("rawTextInput")
+          .value;
+
+
+      if (
+        raw &&
+        raw.trim()
+      ) {
+
+        handleInputUpdate();
+
+      }
+
+    }
+
+
+    if (
+      !state.currentParsedTree
+    ) {
+
+      showToast(
+        "Please enter a folder structure first.",
+        "error"
+      );
+
+      return;
+
+    }
+
+
+    if (
+      typeof JSZip === "undefined"
+    ) {
+
+      showToast(
+        "ZIP library is unavailable. Please refresh the page.",
+        "error"
+      );
+
+      return;
+
+    }
+
+
+    showToast(
+      "Generating ZIP package...",
+      "info"
+    );
 
 
     const zip =
-      new window.JSZip();
+      new JSZip();
 
 
-    addNodesToZip(
-      zip,
-      projectTree
-    );
+    const rootName =
+      sanitizeName(
+        state.currentParsedTree.name
+      ) || "project";
+
+
+    const rootZip =
+      zip.folder(rootName);
+
+
+    if (
+      state.currentParsedTree.children
+    ) {
+
+      state.currentParsedTree.children.forEach(
+        child =>
+          addNodeToZip(
+            child,
+            rootZip
+          )
+      );
+
+    }
 
 
     const blob =
@@ -868,45 +1446,27 @@ async function downloadZip() {
       });
 
 
-    /*
-     * Mobile-friendly download.
-     */
-    const url =
-      URL.createObjectURL(blob);
+    triggerDownload(
+      blob,
+      `${rootName}.zip`
+    );
 
 
-    const anchor =
-      document.createElement("a");
-
-    anchor.href = url;
-
-    anchor.download =
-      getZipFilename();
-
-
-    anchor.style.display = "none";
-
-    document.body.appendChild(anchor);
-
-    anchor.click();
-
-    /*
-     * Give mobile browsers time to start
-     * the download before removing the object.
-     */
-    setTimeout(() => {
-
-      anchor.remove();
-
-      URL.revokeObjectURL(url);
-
-    }, 1500);
-
-
-    showStatus(
-      "ZIP archive created successfully.",
+    showToast(
+      `✅ Generated ${rootName}.zip`,
       "success"
     );
+
+
+    /*
+      Clear the temporary generated ZIP reference.
+
+      Note:
+      This does not guarantee cryptographic erasure
+      from browser memory.
+    */
+
+    state.activeInspectorNode = null;
 
 
   } catch (error) {
@@ -916,72 +1476,566 @@ async function downloadZip() {
       error
     );
 
-    showStatus(
-      "Could not create ZIP: " +
+
+    showToast(
+      "Unable to generate ZIP: " +
       error.message,
       "error"
     );
 
-  } finally {
-
-    downloadBtn.disabled = false;
-
-    downloadBtn.textContent =
-      "Download ZIP";
-
   }
+
 }
 
 
-downloadBtn.addEventListener(
-  "click",
-  downloadZip
-);
+/* ========================================================
+   PURGE INPUT
+======================================================== */
+
+function purgeMemoryAndInput() {
+
+  $("rawTextInput").value = "";
+
+  state.currentParsedTree = null;
+
+  state.nodeIndexMap.clear();
+
+  state.nodeCounter = 0;
+
+  state.totalFolders = 0;
+
+  state.totalFiles = 0;
+
+  state.activeInspectorNode = null;
 
 
-/* =========================================================
-   ZIP NAME
-========================================================= */
-
-function getZipFilename() {
-
-  const first =
-    projectTree[0];
-
-  if (
-    first &&
-    first.type === "folder" &&
-    first.name
-  ) {
-
-    return (
-      first.name
-        .replace(/[^a-zA-Z0-9_-]/g, "-")
-        .replace(/-+/g, "-")
-        .replace(/^-|-$/g, "")
-      || "project"
-    ) + ".zip";
-  }
+  renderTreeDOM();
 
 
-  return "project-structure.zip";
+  $("lineCountBadge").textContent =
+    "0 lines";
+
+
+  $("folderCountPill").textContent =
+    "📁 0 folders";
+
+
+  $("fileCountPill").textContent =
+    "📄 0 files";
+
 }
 
 
-/* =========================================================
+/* ========================================================
+   TOAST
+======================================================== */
+
+function showToast(
+  message,
+  type = "info"
+) {
+
+  const toast =
+    $("statusToast");
+
+
+  const content =
+    $("statusToastContent");
+
+
+  toast.classList.remove(
+    "hidden",
+    "info",
+    "success",
+    "error"
+  );
+
+
+  toast.classList.add(
+    type
+  );
+
+
+  content.textContent =
+    message;
+
+}
+
+
+/* ========================================================
+   FILE INSPECTOR
+======================================================== */
+
+function openInspectorNode(
+  id
+) {
+
+  const node =
+    state.nodeIndexMap.get(id);
+
+
+  if (!node) {
+    return;
+  }
+
+
+  state.activeInspectorNode =
+    node;
+
+
+  $("modalFileName")
+    .textContent =
+    node.name;
+
+
+  $("modalFilePath")
+    .textContent =
+    node.path;
+
+
+  $("modalFileContent")
+    .value =
+    node.content || "";
+
+
+  $("fileInspectorModal")
+    .classList.remove(
+      "hidden"
+    );
+
+}
+
+
+function closeInspector() {
+
+  $("fileInspectorModal")
+    .classList.add(
+      "hidden"
+    );
+
+
+  state.activeInspectorNode =
+    null;
+
+}
+
+
+/* ========================================================
+   COPY
+======================================================== */
+
+async function copyInput() {
+
+  const text =
+    $("rawTextInput")
+      .value;
+
+
+  if (!text) {
+
+    showToast(
+      "There is nothing to copy.",
+      "info"
+    );
+
+    return;
+
+  }
+
+
+  try {
+
+    await navigator.clipboard.writeText(
+      text
+    );
+
+
+    $("copyBtnLabel")
+      .textContent =
+      "Copied";
+
+
+    setTimeout(() => {
+
+      $("copyBtnLabel")
+        .textContent =
+        "Copy";
+
+    }, 1500);
+
+
+  } catch (error) {
+
+    showToast(
+      "Clipboard access was blocked by the browser.",
+      "error"
+    );
+
+  }
+
+}
+
+
+/* ========================================================
    INITIALIZATION
-========================================================= */
+======================================================== */
 
-document.addEventListener("DOMContentLoaded", () => {
-
-  /*
-   * Wait for local JSZip.
-   */
-  waitForJSZip();
+function initializeApp() {
 
   /*
-   * Initial UI.
-   */
-  updateProject();
+    Input
+  */
 
-});
+  $("rawTextInput")
+    .addEventListener(
+      "input",
+      handleInputUpdate
+    );
+
+
+  /*
+    Search
+  */
+
+  $("searchInput")
+    .addEventListener(
+      "input",
+      renderTreeDOM
+    );
+
+
+  /*
+    Preset menu
+  */
+
+  $("presetToggleBtn")
+    .addEventListener(
+      "click",
+      event => {
+
+        event.stopPropagation();
+
+        $("presetMenu")
+          .classList.toggle(
+            "hidden"
+          );
+
+      }
+    );
+
+
+  document.addEventListener(
+    "click",
+    () => {
+
+      $("presetMenu")
+        .classList.add(
+          "hidden"
+        );
+
+    }
+  );
+
+
+  /*
+    Presets
+  */
+
+  document
+    .querySelectorAll(
+      ".preset-option-btn"
+    )
+    .forEach(button => {
+
+      button.addEventListener(
+        "click",
+        event => {
+
+          event.stopPropagation();
+
+
+          const preset =
+            button.dataset.preset;
+
+
+          if (
+            !TEMPLATES[preset]
+          ) {
+
+            return;
+
+          }
+
+
+          $("rawTextInput")
+            .value =
+            TEMPLATES[preset];
+
+
+          $("presetMenu")
+            .classList.add(
+              "hidden"
+            );
+
+
+          handleInputUpdate();
+
+        }
+      );
+
+    });
+
+
+  /*
+    Copy
+  */
+
+  $("copyInputBtn")
+    .addEventListener(
+      "click",
+      copyInput
+    );
+
+
+  /*
+    Clear
+  */
+
+  $("clearInputBtn")
+    .addEventListener(
+      "click",
+      purgeMemoryAndInput
+    );
+
+
+  /*
+    Download
+  */
+
+  $("downloadZipBtn")
+    .addEventListener(
+      "click",
+      handleDownloadZip
+    );
+
+
+  /*
+    Tree clicks
+  */
+
+  $("treeContainer")
+    .addEventListener(
+      "click",
+      event => {
+
+        const inspectButton =
+          event.target.closest(
+            ".inspect-btn"
+          );
+
+
+        if (
+          inspectButton
+        ) {
+
+          event.stopPropagation();
+
+
+          openInspectorNode(
+            inspectButton.dataset.nodeId
+          );
+
+
+          return;
+
+        }
+
+
+        const row =
+          event.target.closest(
+            ".tree-row"
+          );
+
+
+        if (!row) {
+          return;
+        }
+
+
+        if (
+          row.dataset.nodeType ===
+          "file"
+        ) {
+
+          openInspectorNode(
+            row.dataset.nodeId
+          );
+
+        }
+
+      }
+    );
+
+
+  /*
+    Modal
+  */
+
+  $("closeInspectorBtn")
+    .addEventListener(
+      "click",
+      closeInspector
+    );
+
+
+  $("fileInspectorModal")
+    .addEventListener(
+      "click",
+      event => {
+
+        if (
+          event.target ===
+          $("fileInspectorModal")
+        ) {
+
+          closeInspector();
+
+        }
+
+      }
+    );
+
+
+  /*
+    Save file content
+  */
+
+  $("saveInspectorBtn")
+    .addEventListener(
+      "click",
+      () => {
+
+        if (
+          state.activeInspectorNode
+        ) {
+
+          state.activeInspectorNode.content =
+            $("modalFileContent")
+              .value;
+
+        }
+
+
+        closeInspector();
+
+
+        showToast(
+          "File changes saved.",
+          "success"
+        );
+
+      }
+    );
+
+
+  /*
+    Reset boilerplate
+  */
+
+  $("resetModalBoilerplateBtn")
+    .addEventListener(
+      "click",
+      () => {
+
+        if (
+          state.activeInspectorNode
+        ) {
+
+          $("modalFileContent")
+            .value =
+            getBoilerplateContent(
+              state.activeInspectorNode.name
+            );
+
+        }
+
+      }
+    );
+
+
+  /*
+    Close toast
+  */
+
+  $("closeToastBtn")
+    .addEventListener(
+      "click",
+      () => {
+
+        $("statusToast")
+          .classList.add(
+            "hidden"
+          );
+
+      }
+    );
+
+
+  /*
+    ESC key
+  */
+
+  document.addEventListener(
+    "keydown",
+    event => {
+
+      if (
+        event.key === "Escape"
+      ) {
+
+        closeInspector();
+
+        $("presetMenu")
+          .classList.add(
+            "hidden"
+          );
+
+      }
+
+    }
+  );
+
+
+  /*
+    Default template
+  */
+
+  $("rawTextInput")
+    .value =
+    TEMPLATES["react-vite"];
+
+
+  handleInputUpdate();
+
+}
+
+
+/* ========================================================
+   START APP
+======================================================== */
+
+if (
+  document.readyState ===
+  "loading"
+) {
+
+  document.addEventListener(
+    "DOMContentLoaded",
+    initializeApp
+  );
+
+} else {
+
+  initializeApp();
+
+}
