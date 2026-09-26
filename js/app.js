@@ -6,18 +6,12 @@ FILE STRUCTURE BUILDER
 Production Client-Side Application
 =========================================================
 
-Privacy model:
-
 - No backend
 - No database
 - No authentication
 - No intentional upload of user input
-- File structures are processed in the browser
+- File structures are processed locally
 - ZIP generation happens locally
-
-Important:
-Clearing JavaScript references does not guarantee
-cryptographic erasure from browser memory.
 =========================================================
 */
 
@@ -27,19 +21,12 @@ cryptographic erasure from browser memory.
 ======================================================== */
 
 const state = {
-
   currentParsedTree: null,
-
   nodeIndexMap: new Map(),
-
   nodeCounter: 0,
-
   totalFolders: 0,
-
   totalFiles: 0,
-
   activeInspectorNode: null
-
 };
 
 
@@ -73,8 +60,6 @@ const TEMPLATES = {
 ├── vite.config.js
 └── README.md`,
 
-
-
   "express-api": `my-express-api/
 ├── src/
 │   ├── config/
@@ -98,8 +83,6 @@ const TEMPLATES = {
 ├── package.json
 └── README.md`,
 
-
-
   "nextjs-app": `my-next-project/
 ├── app/
 │   ├── api/
@@ -120,8 +103,6 @@ const TEMPLATES = {
 ├── package.json
 └── README.md`,
 
-
-
   "python-pkg": `my_python_pkg/
 ├── src/
 │   └── my_pkg/
@@ -138,13 +119,11 @@ const TEMPLATES = {
 
 
 /* ========================================================
-   DOM HELPERS
+   DOM HELPER
 ======================================================== */
 
 function $(id) {
-
   return document.getElementById(id);
-
 }
 
 
@@ -172,13 +151,13 @@ function sanitizeName(name) {
     ""
   );
 
-  // Replace characters invalid on Windows
+  // Replace invalid Windows filename characters
   clean = clean.replace(
     /[:*?"<>|]/g,
     "_"
   );
 
-  // Prevent dangerous path traversal
+  // Prevent path traversal
   clean = clean.replace(
     /\.\.(?=\/|\\|$)/g,
     "_"
@@ -189,7 +168,6 @@ function sanitizeName(name) {
     .replace(/\.+$/, "");
 
   return clean;
-
 }
 
 
@@ -217,7 +195,6 @@ function getBoilerplateContent(filename) {
     "dev": "vite"
   }
 }`;
-
   }
 
 
@@ -231,7 +208,6 @@ dist/
 *.log
 .DS_Store
 `;
-
   }
 
 
@@ -251,7 +227,6 @@ EXPOSE 3000
 
 CMD ["npm", "start"]
 `;
-
   }
 
 
@@ -263,7 +238,6 @@ Generated with File Structure Builder.
 
 This project structure was generated locally in your browser.
 `;
-
   }
 
 
@@ -283,7 +257,6 @@ This project structure was generated locally in your browser.
 </body>
 </html>
 `;
-
   }
 
 
@@ -298,7 +271,6 @@ body {
   font-family: sans-serif;
 }
 `;
-
   }
 
 
@@ -324,7 +296,6 @@ export default function ${componentName}() {
   );
 }
 `;
-
   }
 
 
@@ -343,7 +314,6 @@ export function main() {
 
 main();
 `;
-
   }
 
 
@@ -360,7 +330,6 @@ def main():
 if __name__ == "__main__":
     main()
 `;
-
   }
 
 
@@ -370,13 +339,11 @@ if __name__ == "__main__":
   "status": "ok"
 }
 `;
-
   }
 
 
   return `/* ${filename} */
 `;
-
 }
 
 
@@ -384,11 +351,7 @@ if __name__ == "__main__":
    NODE CREATION
 ======================================================== */
 
-function createSafeNode(
-  name,
-  type,
-  path
-) {
+function createSafeNode(name, type, path) {
 
   state.nodeCounter++;
 
@@ -399,20 +362,14 @@ function createSafeNode(
     sanitizeName(name);
 
   const node = {
-
     id: safeId,
-
     name: safeName,
-
-    type,
-
-    path,
-
+    type: type,
+    path: path,
     children:
       type === "folder"
         ? []
         : undefined
-
   };
 
   state.nodeIndexMap.set(
@@ -421,7 +378,6 @@ function createSafeNode(
   );
 
   return node;
-
 }
 
 
@@ -432,35 +388,27 @@ function createSafeNode(
 function parseFileStructure(rawText) {
 
   state.nodeIndexMap.clear();
-
   state.nodeCounter = 0;
 
   if (
     !rawText ||
     !rawText.trim()
   ) {
-
     return null;
-
   }
 
+  let cleaned = rawText.trim();
 
-  let cleaned =
-    rawText.trim();
-
-
-  // Remove markdown code fences
-  cleaned =
-    cleaned
-      .replace(
-        /^```[a-zA-Z]*\s*/gm,
-        ""
-      )
-      .replace(
-        /```\s*$/gm,
-        ""
-      );
-
+  // Remove markdown fences
+  cleaned = cleaned
+    .replace(
+      /^```[a-zA-Z]*\s*/gm,
+      ""
+    )
+    .replace(
+      /```\s*$/gm,
+      ""
+    );
 
   const lines =
     cleaned
@@ -469,11 +417,9 @@ function parseFileStructure(rawText) {
         line => line.trim().length > 0
       );
 
-
   if (!lines.length) {
     return null;
   }
-
 
   const isPathList =
     lines.every(
@@ -484,11 +430,9 @@ function parseFileStructure(rawText) {
         )
     );
 
-
   return isPathList
     ? parsePathList(lines)
     : parseAsciiTree(lines);
-
 }
 
 
@@ -505,9 +449,7 @@ function parsePathList(lines) {
       ""
     );
 
-  const map =
-    new Map();
-
+  const map = new Map();
 
   for (const line of lines) {
 
@@ -516,25 +458,17 @@ function parsePathList(lines) {
         .trim()
         .replace(/\\/g, "/");
 
-
     if (clean.startsWith("./")) {
-
-      clean =
-        clean.substring(2);
-
+      clean = clean.substring(2);
     }
-
 
     const parts =
       clean
         .split("/")
         .filter(Boolean);
 
-
     let currentPath = "";
-
     let parent = rootNode;
-
 
     parts.forEach(
       (rawPart, index) => {
@@ -546,28 +480,22 @@ function parsePathList(lines) {
           !isLast ||
           rawPart.endsWith("/");
 
-
         const part =
           sanitizeName(
-            rawPart
-              .replace(/\/$/, "")
+            rawPart.replace(/\/$/, "")
           );
-
 
         if (!part) {
           return;
         }
-
 
         currentPath =
           currentPath
             ? `${currentPath}/${part}`
             : part;
 
-
         let node =
           map.get(currentPath);
-
 
         if (!node) {
 
@@ -585,40 +513,26 @@ function parsePathList(lines) {
             node
           );
 
-
-          parent.children.push(
-            node
-          );
-
+          parent.children.push(node);
         }
-
 
         if (
           node.type === "folder"
         ) {
-
           parent = node;
-
         }
-
       }
     );
-
   }
-
 
   if (
     rootNode.children.length === 1 &&
     rootNode.children[0].type === "folder"
   ) {
-
     return rootNode.children[0];
-
   }
 
-
   return rootNode;
-
 }
 
 
@@ -638,12 +552,10 @@ function parseAsciiTree(lines) {
             ""
           );
 
-
         const nameMatch =
           clean.match(
             /^[\s\t│|├└+─\-]+/
           );
-
 
         if (!nameMatch) {
 
@@ -654,13 +566,10 @@ function parseAsciiTree(lines) {
             return null;
           }
 
-
           const explicitFolder =
             trimmed.endsWith("/");
 
-
           return {
-
             depth: 0,
 
             name:
@@ -672,45 +581,32 @@ function parseAsciiTree(lines) {
 
             isExplicitFolder:
               explicitFolder
-
           };
-
         }
-
 
         const prefix =
           nameMatch[0];
-
 
         let name =
           clean
             .substring(prefix.length)
             .trim();
 
-
         if (!name) {
           return null;
         }
 
-
         const isExplicitFolder =
           name.endsWith("/");
 
-
         if (isExplicitFolder) {
-
-          name =
-            name.slice(0, -1);
-
+          name = name.slice(0, -1);
         }
-
 
         const branchIndex =
           prefix.search(/[├└+]/);
 
-
         let depth = 1;
-
 
         if (branchIndex >= 0) {
 
@@ -718,7 +614,6 @@ function parseAsciiTree(lines) {
             prefix
               .substring(0, branchIndex)
               .replace(/\t/g, "    ");
-
 
           depth =
             1 +
@@ -734,7 +629,6 @@ function parseAsciiTree(lines) {
               "    "
             );
 
-
           depth =
             Math.max(
               1,
@@ -742,33 +636,26 @@ function parseAsciiTree(lines) {
                 expanded.length / 2
               )
             );
-
         }
 
-
         return {
-
           depth,
 
           name:
             sanitizeName(name),
 
           isExplicitFolder
-
         };
 
       })
       .filter(Boolean);
 
-
   if (!parsed.length) {
     return null;
   }
 
-
   const rootLine =
     parsed[0];
-
 
   const rootNode =
     createSafeNode(
@@ -777,14 +664,12 @@ function parseAsciiTree(lines) {
       rootLine.name
     );
 
-
   const stack = [
     {
       node: rootNode,
       depth: rootLine.depth
     }
   ];
-
 
   for (
     let i = 1;
@@ -798,22 +683,18 @@ function parseAsciiTree(lines) {
     const next =
       parsed[i + 1];
 
-
     const nextIsDeeper =
       next &&
       next.depth > current.depth;
-
 
     const hasExtension =
       current.name.includes(".") &&
       !current.name.startsWith(".");
 
-
     const isFolder =
       current.isExplicitFolder ||
       nextIsDeeper ||
       !hasExtension;
-
 
     while (
       stack.length > 1 &&
@@ -821,23 +702,18 @@ function parseAsciiTree(lines) {
         stack.length - 1
       ].depth >= current.depth
     ) {
-
       stack.pop();
-
     }
-
 
     const parent =
       stack[
         stack.length - 1
       ].node;
 
-
     const itemPath =
       parent.path
         ? `${parent.path}/${current.name}`
         : current.name;
-
 
     const node =
       createSafeNode(
@@ -848,32 +724,22 @@ function parseAsciiTree(lines) {
         itemPath
       );
 
-
     if (!parent.children) {
       parent.children = [];
     }
 
-
     parent.children.push(node);
-
 
     if (isFolder) {
 
       stack.push({
-
-        node,
-
+        node: node,
         depth: current.depth
-
       });
-
     }
-
   }
 
-
   return rootNode;
-
 }
 
 
@@ -883,15 +749,19 @@ function parseAsciiTree(lines) {
 
 function handleInputUpdate() {
 
-  const raw =
-    $("rawTextInput").value;
+  const input =
+    $("rawTextInput");
 
+  if (!input) {
+    return;
+  }
+
+  const raw = input.value;
 
   const lines =
     raw
       ? raw.split("\n").length
       : 0;
-
 
   $("lineCountBadge").textContent =
     `${lines} ${
@@ -900,15 +770,11 @@ function handleInputUpdate() {
         : "lines"
     }`;
 
-
   state.currentParsedTree =
     parseFileStructure(raw);
 
-
   state.totalFolders = 0;
-
   state.totalFiles = 0;
-
 
   if (
     state.currentParsedTree
@@ -917,20 +783,15 @@ function handleInputUpdate() {
     prepareTree(
       state.currentParsedTree
     );
-
   }
-
 
   $("folderCountPill").textContent =
     `📁 ${state.totalFolders} folders`;
 
-
   $("fileCountPill").textContent =
     `📄 ${state.totalFiles} files`;
 
-
   renderTreeDOM();
-
 }
 
 
@@ -944,22 +805,17 @@ function prepareTree(node) {
 
     state.totalFolders++;
 
-
     if (node.children) {
 
       node.children.forEach(
         prepareTree
       );
-
     }
 
     return;
-
   }
 
-
   state.totalFiles++;
-
 
   if (
     node.content === undefined
@@ -969,9 +825,7 @@ function prepareTree(node) {
       getBoilerplateContent(
         node.name
       );
-
   }
-
 }
 
 
@@ -1002,7 +856,6 @@ function escapeHTML(value) {
       /'/g,
       "&#039;"
     );
-
 }
 
 
@@ -1019,17 +872,13 @@ function nodeMatchesSearch(
     return true;
   }
 
-
   if (
     node.name
       .toLowerCase()
       .includes(query)
   ) {
-
     return true;
-
   }
-
 
   if (
     node.type === "folder" &&
@@ -1043,12 +892,9 @@ function nodeMatchesSearch(
           query
         )
     );
-
   }
 
-
   return false;
-
 }
 
 
@@ -1061,22 +907,26 @@ function renderTreeDOM() {
   const container =
     $("treeContainer");
 
+  if (!container) {
+    return;
+  }
+
+  const search =
+    $("searchInput");
 
   const query =
-    $("searchInput")
-      .value
-      .toLowerCase()
-      .trim();
-
+    search
+      ? search.value
+          .toLowerCase()
+          .trim()
+      : "";
 
   if (
     !state.currentParsedTree
   ) {
 
     container.innerHTML = `
-
       <div class="tree-empty">
-
         <div style="font-size:40px">
           📁
         </div>
@@ -1084,13 +934,10 @@ function renderTreeDOM() {
         <p>
           No folder structure parsed yet.
         </p>
-
       </div>
-
     `;
 
     return;
-
   }
 
 
@@ -1102,24 +949,18 @@ function renderTreeDOM() {
         query
       )
     ) {
-
       return "";
-
     }
-
 
     const isFolder =
       node.type === "folder";
-
 
     const icon =
       isFolder
         ? "📁"
         : "📄";
 
-
     let childrenHTML = "";
-
 
     if (
       isFolder &&
@@ -1128,36 +969,26 @@ function renderTreeDOM() {
     ) {
 
       childrenHTML = `
-
         <div class="tree-children">
-
           ${node.children
             .map(buildNodeHTML)
             .join("")}
-
         </div>
-
       `;
-
     }
-
 
     const safeName =
       escapeHTML(node.name);
 
-
     const safeId =
       escapeHTML(node.id);
-
 
     const itemCount =
       node.children
         ? node.children.length
         : 0;
 
-
     return `
-
       <div class="tree-node">
 
         <div
@@ -1195,7 +1026,6 @@ function renderTreeDOM() {
 
           </div>
 
-
           <div>
 
             ${
@@ -1227,26 +1057,183 @@ function renderTreeDOM() {
 
         </div>
 
-
         ${childrenHTML}
 
       </div>
-
     `;
-
   }
-
 
   container.innerHTML =
     buildNodeHTML(
       state.currentParsedTree
     );
-
 }
 
 
 /* ========================================================
-   ZIP DOWNLOAD
+   ZIP LIBRARY LOADER
+======================================================== */
+
+/*
+ * This is the important fix.
+ *
+ * JSZip should be available as window.JSZip.
+ * If it is not available, try loading the local
+ * library again.
+ */
+
+function isJSZipReady() {
+
+  return (
+    typeof window.JSZip === "function"
+  );
+}
+
+
+function loadJSZip() {
+
+  return new Promise(
+    (resolve, reject) => {
+
+      // Already loaded
+      if (isJSZipReady()) {
+        resolve(window.JSZip);
+        return;
+      }
+
+      // Look for an existing script
+      const existingScript =
+        document.querySelector(
+          'script[src*="jszip.min.js"]'
+        );
+
+      if (existingScript) {
+
+        existingScript.addEventListener(
+          "load",
+          () => {
+
+            if (isJSZipReady()) {
+              resolve(window.JSZip);
+            } else {
+              reject(
+                new Error(
+                  "JSZip loaded but window.JSZip was not created."
+                )
+              );
+            }
+
+          },
+          { once: true }
+        );
+
+        existingScript.addEventListener(
+          "error",
+          () => {
+
+            reject(
+              new Error(
+                "Unable to load JSZip library."
+              )
+            );
+
+          },
+          { once: true }
+        );
+
+        // Check again shortly in case it loaded
+        const checkInterval =
+          setInterval(
+            () => {
+
+              if (isJSZipReady()) {
+
+                clearInterval(
+                  checkInterval
+                );
+
+                resolve(
+                  window.JSZip
+                );
+              }
+
+            },
+            50
+          );
+
+        setTimeout(
+          () => {
+
+            clearInterval(
+              checkInterval
+            );
+
+            if (!isJSZipReady()) {
+
+              reject(
+                new Error(
+                  "JSZip did not become available."
+                )
+              );
+            }
+
+          },
+          5000
+        );
+
+        return;
+      }
+
+
+      // No existing script found.
+      // Create one dynamically.
+
+      const script =
+        document.createElement("script");
+
+      script.src =
+        "./lib/jszip.min.js?v=2";
+
+      script.async = false;
+
+      script.onload = () => {
+
+        if (isJSZipReady()) {
+
+          resolve(
+            window.JSZip
+          );
+
+        } else {
+
+          reject(
+            new Error(
+              "JSZip loaded but is unavailable."
+            )
+          );
+        }
+      };
+
+      script.onerror = () => {
+
+        reject(
+          new Error(
+            "Could not load ./lib/jszip.min.js"
+          )
+        );
+      };
+
+      document.head.appendChild(
+        script
+      );
+
+    }
+  );
+}
+
+
+/* ========================================================
+   TRIGGER DOWNLOAD
 ======================================================== */
 
 function triggerDownload(
@@ -1257,34 +1244,31 @@ function triggerDownload(
   const url =
     URL.createObjectURL(blob);
 
-
   const link =
     document.createElement("a");
 
-
   link.href = url;
-
   link.download = filename;
-
   link.style.display = "none";
-
 
   document.body.appendChild(
     link
   );
 
-
   link.click();
 
+  setTimeout(
+    () => {
 
-  setTimeout(() => {
+      link.remove();
 
-    link.remove();
+      URL.revokeObjectURL(
+        url
+      );
 
-    URL.revokeObjectURL(url);
-
-  }, 1000);
-
+    },
+    1000
+  );
 }
 
 
@@ -1298,8 +1282,9 @@ function addNodeToZip(
 ) {
 
   const cleanName =
-    sanitizeName(node.name);
-
+    sanitizeName(
+      node.name
+    );
 
   if (!cleanName) {
     return;
@@ -1315,24 +1300,23 @@ function addNodeToZip(
         cleanName
       );
 
-
     if (
       node.children
     ) {
 
       node.children.forEach(
-        child =>
+        child => {
+
           addNodeToZip(
             child,
             subFolder
-          )
-      );
+          );
 
+        }
+      );
     }
 
-
     return;
-
   }
 
 
@@ -1340,7 +1324,6 @@ function addNodeToZip(
     cleanName,
     node.content || ""
   );
-
 }
 
 
@@ -1352,14 +1335,16 @@ async function handleDownloadZip() {
 
   try {
 
+    /*
+     * Make sure tree exists
+     */
+
     if (
       !state.currentParsedTree
     ) {
 
       const raw =
-        $("rawTextInput")
-          .value;
-
+        $("rawTextInput").value;
 
       if (
         raw &&
@@ -1367,11 +1352,13 @@ async function handleDownloadZip() {
       ) {
 
         handleInputUpdate();
-
       }
-
     }
 
+
+    /*
+     * Stop if no structure
+     */
 
     if (
       !state.currentParsedTree
@@ -1383,23 +1370,68 @@ async function handleDownloadZip() {
       );
 
       return;
-
     }
 
 
+    /*
+     * Make absolutely sure JSZip exists
+     */
+
     if (
-      typeof JSZip === "undefined"
+      !isJSZipReady()
     ) {
 
       showToast(
-        "ZIP library is unavailable. Please refresh the page.",
+        "Loading ZIP library...",
+        "info"
+      );
+
+      try {
+
+        await loadJSZip();
+
+      } catch (libraryError) {
+
+        console.error(
+          "JSZip loading error:",
+          libraryError
+        );
+
+        showToast(
+          "ZIP library failed to load. Please refresh the page.",
+          "error"
+        );
+
+        return;
+      }
+    }
+
+
+    /*
+     * Final safety check
+     */
+
+    if (
+      typeof window.JSZip !== "function"
+    ) {
+
+      console.error(
+        "JSZip unavailable:",
+        window.JSZip
+      );
+
+      showToast(
+        "ZIP library is unavailable.",
         "error"
       );
 
       return;
-
     }
 
+
+    /*
+     * Start generation
+     */
 
     showToast(
       "Generating ZIP package...",
@@ -1407,9 +1439,18 @@ async function handleDownloadZip() {
     );
 
 
-    const zip =
-      new JSZip();
+    /*
+     * IMPORTANT:
+     * Use window.JSZip
+     */
 
+    const zip =
+      new window.JSZip();
+
+
+    /*
+     * Root folder
+     */
 
     const rootName =
       sanitizeName(
@@ -1418,33 +1459,53 @@ async function handleDownloadZip() {
 
 
     const rootZip =
-      zip.folder(rootName);
+      zip.folder(
+        rootName
+      );
 
+
+    /*
+     * Add children
+     */
 
     if (
       state.currentParsedTree.children
     ) {
 
       state.currentParsedTree.children.forEach(
-        child =>
+        child => {
+
           addNodeToZip(
             child,
             rootZip
-          )
-      );
+          );
 
+        }
+      );
     }
 
 
+    /*
+     * Generate ZIP
+     */
+
     const blob =
       await zip.generateAsync({
+
         type: "blob",
+
         compression: "DEFLATE",
+
         compressionOptions: {
           level: 6
         }
+
       });
 
+
+    /*
+     * Download
+     */
 
     triggerDownload(
       blob,
@@ -1452,22 +1513,18 @@ async function handleDownloadZip() {
     );
 
 
+    /*
+     * Success
+     */
+
     showToast(
       `✅ Generated ${rootName}.zip`,
       "success"
     );
 
 
-    /*
-      Clear the temporary generated ZIP reference.
-
-      Note:
-      This does not guarantee cryptographic erasure
-      from browser memory.
-    */
-
-    state.activeInspectorNode = null;
-
+    state.activeInspectorNode =
+      null;
 
   } catch (error) {
 
@@ -1476,27 +1533,30 @@ async function handleDownloadZip() {
       error
     );
 
-
     showToast(
       "Unable to generate ZIP: " +
-      error.message,
+      (
+        error &&
+        error.message
+          ? error.message
+          : "Unknown error"
+      ),
       "error"
     );
-
   }
-
 }
 
 
 /* ========================================================
-   PURGE INPUT
+   CLEAR INPUT / RESET
 ======================================================== */
 
 function purgeMemoryAndInput() {
 
   $("rawTextInput").value = "";
 
-  state.currentParsedTree = null;
+  state.currentParsedTree =
+    null;
 
   state.nodeIndexMap.clear();
 
@@ -1506,23 +1566,19 @@ function purgeMemoryAndInput() {
 
   state.totalFiles = 0;
 
-  state.activeInspectorNode = null;
-
+  state.activeInspectorNode =
+    null;
 
   renderTreeDOM();
-
 
   $("lineCountBadge").textContent =
     "0 lines";
 
-
   $("folderCountPill").textContent =
     "📁 0 folders";
 
-
   $("fileCountPill").textContent =
     "📄 0 files";
-
 }
 
 
@@ -1538,10 +1594,15 @@ function showToast(
   const toast =
     $("statusToast");
 
-
   const content =
     $("statusToastContent");
 
+  if (
+    !toast ||
+    !content
+  ) {
+    return;
+  }
 
   toast.classList.remove(
     "hidden",
@@ -1550,15 +1611,12 @@ function showToast(
     "error"
   );
 
-
   toast.classList.add(
     type
   );
 
-
   content.textContent =
     message;
-
 }
 
 
@@ -1573,36 +1631,29 @@ function openInspectorNode(
   const node =
     state.nodeIndexMap.get(id);
 
-
   if (!node) {
     return;
   }
 
-
   state.activeInspectorNode =
     node;
-
 
   $("modalFileName")
     .textContent =
     node.name;
 
-
   $("modalFilePath")
     .textContent =
     node.path;
-
 
   $("modalFileContent")
     .value =
     node.content || "";
 
-
   $("fileInspectorModal")
     .classList.remove(
       "hidden"
     );
-
 }
 
 
@@ -1613,10 +1664,8 @@ function closeInspector() {
       "hidden"
     );
 
-
   state.activeInspectorNode =
     null;
-
 }
 
 
@@ -1627,9 +1676,7 @@ function closeInspector() {
 async function copyInput() {
 
   const text =
-    $("rawTextInput")
-      .value;
-
+    $("rawTextInput").value;
 
   if (!text) {
 
@@ -1639,9 +1686,7 @@ async function copyInput() {
     );
 
     return;
-
   }
-
 
   try {
 
@@ -1649,20 +1694,20 @@ async function copyInput() {
       text
     );
 
-
     $("copyBtnLabel")
       .textContent =
       "Copied";
 
+    setTimeout(
+      () => {
 
-    setTimeout(() => {
+        $("copyBtnLabel")
+          .textContent =
+          "Copy";
 
-      $("copyBtnLabel")
-        .textContent =
-        "Copy";
-
-    }, 1500);
-
+      },
+      1500
+    );
 
   } catch (error) {
 
@@ -1670,21 +1715,19 @@ async function copyInput() {
       "Clipboard access was blocked by the browser.",
       "error"
     );
-
   }
-
 }
 
 
 /* ========================================================
-   INITIALIZATION
+   INITIALIZE APPLICATION
 ======================================================== */
 
 function initializeApp() {
 
-  /*
-    Input
-  */
+  /* -------------------------------------------------------
+     Input
+  ------------------------------------------------------- */
 
   $("rawTextInput")
     .addEventListener(
@@ -1693,9 +1736,9 @@ function initializeApp() {
     );
 
 
-  /*
-    Search
-  */
+  /* -------------------------------------------------------
+     Search
+  ------------------------------------------------------- */
 
   $("searchInput")
     .addEventListener(
@@ -1704,9 +1747,9 @@ function initializeApp() {
     );
 
 
-  /*
-    Preset menu
-  */
+  /* -------------------------------------------------------
+     Preset menu
+  ------------------------------------------------------- */
 
   $("presetToggleBtn")
     .addEventListener(
@@ -1719,7 +1762,6 @@ function initializeApp() {
           .classList.toggle(
             "hidden"
           );
-
       }
     );
 
@@ -1737,58 +1779,51 @@ function initializeApp() {
   );
 
 
-  /*
-    Presets
-  */
+  /* -------------------------------------------------------
+     Presets
+  ------------------------------------------------------- */
 
   document
     .querySelectorAll(
       ".preset-option-btn"
     )
-    .forEach(button => {
+    .forEach(
+      button => {
 
-      button.addEventListener(
-        "click",
-        event => {
+        button.addEventListener(
+          "click",
+          event => {
 
-          event.stopPropagation();
+            event.stopPropagation();
 
+            const preset =
+              button.dataset.preset;
 
-          const preset =
-            button.dataset.preset;
+            if (
+              !TEMPLATES[preset]
+            ) {
+              return;
+            }
 
+            $("rawTextInput")
+              .value =
+              TEMPLATES[preset];
 
-          if (
-            !TEMPLATES[preset]
-          ) {
+            $("presetMenu")
+              .classList.add(
+                "hidden"
+              );
 
-            return;
-
+            handleInputUpdate();
           }
+        );
+      }
+    );
 
 
-          $("rawTextInput")
-            .value =
-            TEMPLATES[preset];
-
-
-          $("presetMenu")
-            .classList.add(
-              "hidden"
-            );
-
-
-          handleInputUpdate();
-
-        }
-      );
-
-    });
-
-
-  /*
-    Copy
-  */
+  /* -------------------------------------------------------
+     Copy
+  ------------------------------------------------------- */
 
   $("copyInputBtn")
     .addEventListener(
@@ -1797,9 +1832,9 @@ function initializeApp() {
     );
 
 
-  /*
-    Clear
-  */
+  /* -------------------------------------------------------
+     Clear
+  ------------------------------------------------------- */
 
   $("clearInputBtn")
     .addEventListener(
@@ -1808,9 +1843,9 @@ function initializeApp() {
     );
 
 
-  /*
-    Download
-  */
+  /* -------------------------------------------------------
+     Download ZIP
+  ------------------------------------------------------- */
 
   $("downloadZipBtn")
     .addEventListener(
@@ -1819,9 +1854,9 @@ function initializeApp() {
     );
 
 
-  /*
-    Tree clicks
-  */
+  /* -------------------------------------------------------
+     Tree clicks
+  ------------------------------------------------------- */
 
   $("treeContainer")
     .addEventListener(
@@ -1833,21 +1868,17 @@ function initializeApp() {
             ".inspect-btn"
           );
 
-
         if (
           inspectButton
         ) {
 
           event.stopPropagation();
 
-
           openInspectorNode(
             inspectButton.dataset.nodeId
           );
 
-
           return;
-
         }
 
 
@@ -1855,7 +1886,6 @@ function initializeApp() {
           event.target.closest(
             ".tree-row"
           );
-
 
         if (!row) {
           return;
@@ -1870,16 +1900,14 @@ function initializeApp() {
           openInspectorNode(
             row.dataset.nodeId
           );
-
         }
-
       }
     );
 
 
-  /*
-    Modal
-  */
+  /* -------------------------------------------------------
+     Close inspector
+  ------------------------------------------------------- */
 
   $("closeInspectorBtn")
     .addEventListener(
@@ -1899,16 +1927,14 @@ function initializeApp() {
         ) {
 
           closeInspector();
-
         }
-
       }
     );
 
 
-  /*
-    Save file content
-  */
+  /* -------------------------------------------------------
+     Save file content
+  ------------------------------------------------------- */
 
   $("saveInspectorBtn")
     .addEventListener(
@@ -1922,25 +1948,21 @@ function initializeApp() {
           state.activeInspectorNode.content =
             $("modalFileContent")
               .value;
-
         }
 
-
         closeInspector();
-
 
         showToast(
           "File changes saved.",
           "success"
         );
-
       }
     );
 
 
-  /*
-    Reset boilerplate
-  */
+  /* -------------------------------------------------------
+     Reset boilerplate
+  ------------------------------------------------------- */
 
   $("resetModalBoilerplateBtn")
     .addEventListener(
@@ -1956,16 +1978,14 @@ function initializeApp() {
             getBoilerplateContent(
               state.activeInspectorNode.name
             );
-
         }
-
       }
     );
 
 
-  /*
-    Close toast
-  */
+  /* -------------------------------------------------------
+     Close toast
+  ------------------------------------------------------- */
 
   $("closeToastBtn")
     .addEventListener(
@@ -1976,14 +1996,13 @@ function initializeApp() {
           .classList.add(
             "hidden"
           );
-
       }
     );
 
 
-  /*
-    ESC key
-  */
+  /* -------------------------------------------------------
+     ESC key
+  ------------------------------------------------------- */
 
   document.addEventListener(
     "keydown",
@@ -1999,29 +2018,45 @@ function initializeApp() {
           .classList.add(
             "hidden"
           );
-
       }
-
     }
   );
 
 
-  /*
-    Default template
-  */
+  /* -------------------------------------------------------
+     Default template
+  ------------------------------------------------------- */
 
   $("rawTextInput")
     .value =
     TEMPLATES["react-vite"];
 
-
   handleInputUpdate();
 
+
+  /* -------------------------------------------------------
+     Pre-check JSZip
+  ------------------------------------------------------- */
+
+  if (isJSZipReady()) {
+
+    console.log(
+      "JSZip loaded successfully.",
+      window.JSZip.version || ""
+    );
+
+  } else {
+
+    console.warn(
+      "JSZip is not available at initialization. " +
+      "It will be loaded when Download ZIP is clicked."
+    );
+  }
 }
 
 
 /* ========================================================
-   START APP
+   START APPLICATION
 ======================================================== */
 
 if (
@@ -2037,5 +2072,4 @@ if (
 } else {
 
   initializeApp();
-
 }
