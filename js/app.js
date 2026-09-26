@@ -1,23 +1,12 @@
 "use strict";
 
-/*
-=========================================================
-FILE STRUCTURE BUILDER
-Production Client-Side Application
-=========================================================
-
-- No backend
-- No database
-- No authentication
-- No intentional upload of user input
-- File structures are processed locally
-- ZIP generation happens locally
-=========================================================
-*/
+/* ========================================================
+   FILE STRUCTURE BUILDER - TEMPORARY DEBUG VERSION
+======================================================== */
 
 
 /* ========================================================
-   APPLICATION STATE
+   STATE
 ======================================================== */
 
 const state = {
@@ -119,7 +108,7 @@ const TEMPLATES = {
 
 
 /* ========================================================
-   DOM HELPER
+   DOM
 ======================================================== */
 
 function $(id) {
@@ -128,7 +117,7 @@ function $(id) {
 
 
 /* ========================================================
-   INPUT SANITIZATION
+   SANITIZE
 ======================================================== */
 
 function sanitizeName(name) {
@@ -139,25 +128,21 @@ function sanitizeName(name) {
 
   let clean = String(name).trim();
 
-  // Remove comments
   clean = clean.replace(
     /\s*(?:#|\/\/).*$/,
     ""
   );
 
-  // Remove leading/trailing separators
   clean = clean.replace(
     /^[\/\\]+|[\/\\]+$/g,
     ""
   );
 
-  // Replace invalid Windows filename characters
   clean = clean.replace(
     /[:*?"<>|]/g,
     "_"
   );
 
-  // Prevent path traversal
   clean = clean.replace(
     /\.\.(?=\/|\\|$)/g,
     "_"
@@ -172,7 +157,7 @@ function sanitizeName(name) {
 
 
 /* ========================================================
-   BOILERPLATE GENERATOR
+   BOILERPLATE
 ======================================================== */
 
 function getBoilerplateContent(filename) {
@@ -181,7 +166,8 @@ function getBoilerplateContent(filename) {
     return "";
   }
 
-  const lower = filename.toLowerCase();
+  const lower =
+    filename.toLowerCase();
 
 
   if (lower === "package.json") {
@@ -251,9 +237,7 @@ This project structure was generated locally in your browser.
     <title>App</title>
 </head>
 <body>
-
     <h1>Hello World</h1>
-
 </body>
 </html>
 `;
@@ -279,19 +263,20 @@ body {
     lower.endsWith(".tsx")
   ) {
 
-    const baseName =
-      filename.split(".")[0] || "Component";
+    const base =
+      filename.split(".")[0] ||
+      "Component";
 
-    const componentName =
-      baseName.charAt(0).toUpperCase() +
-      baseName.slice(1);
+    const component =
+      base.charAt(0).toUpperCase() +
+      base.slice(1);
 
     return `import React from "react";
 
-export default function ${componentName}() {
+export default function ${component}() {
   return (
     <div>
-      <h2>${componentName} Component</h2>
+      <h2>${component} Component</h2>
     </div>
   );
 }
@@ -348,32 +333,38 @@ if __name__ == "__main__":
 
 
 /* ========================================================
-   NODE CREATION
+   NODE
 ======================================================== */
 
-function createSafeNode(name, type, path) {
+function createSafeNode(
+  name,
+  type,
+  path
+) {
 
   state.nodeCounter++;
 
-  const safeId =
-    `node_${state.nodeCounter}`;
-
-  const safeName =
-    sanitizeName(name);
-
   const node = {
-    id: safeId,
-    name: safeName,
-    type: type,
-    path: path,
+
+    id:
+      `node_${state.nodeCounter}`,
+
+    name:
+      sanitizeName(name),
+
+    type,
+
+    path,
+
     children:
       type === "folder"
         ? []
         : undefined
+
   };
 
   state.nodeIndexMap.set(
-    safeId,
+    node.id,
     node
   );
 
@@ -382,39 +373,43 @@ function createSafeNode(name, type, path) {
 
 
 /* ========================================================
-   PARSE INPUT
+   PARSE STRUCTURE
 ======================================================== */
 
 function parseFileStructure(rawText) {
 
   state.nodeIndexMap.clear();
+
   state.nodeCounter = 0;
 
   if (
     !rawText ||
     !rawText.trim()
   ) {
+
     return null;
   }
 
-  let cleaned = rawText.trim();
+  let cleaned =
+    rawText.trim();
 
-  // Remove markdown fences
-  cleaned = cleaned
-    .replace(
-      /^```[a-zA-Z]*\s*/gm,
-      ""
-    )
-    .replace(
-      /```\s*$/gm,
-      ""
-    );
+  cleaned =
+    cleaned
+      .replace(
+        /^```[a-zA-Z]*\s*/gm,
+        ""
+      )
+      .replace(
+        /```\s*$/gm,
+        ""
+      );
 
   const lines =
     cleaned
       .split(/\r?\n/)
       .filter(
-        line => line.trim().length > 0
+        line =>
+          line.trim().length > 0
       );
 
   if (!lines.length) {
@@ -430,26 +425,29 @@ function parseFileStructure(rawText) {
         )
     );
 
-  return isPathList
-    ? parsePathList(lines)
-    : parseAsciiTree(lines);
+  if (isPathList) {
+    return parsePathList(lines);
+  }
+
+  return parseAsciiTree(lines);
 }
 
 
 /* ========================================================
-   PATH LIST PARSER
+   PATH LIST
 ======================================================== */
 
 function parsePathList(lines) {
 
-  const rootNode =
+  const root =
     createSafeNode(
       "project",
       "folder",
       ""
     );
 
-  const map = new Map();
+  const map =
+    new Map();
 
   for (const line of lines) {
 
@@ -458,8 +456,12 @@ function parsePathList(lines) {
         .trim()
         .replace(/\\/g, "/");
 
-    if (clean.startsWith("./")) {
-      clean = clean.substring(2);
+    if (
+      clean.startsWith("./")
+    ) {
+
+      clean =
+        clean.substring(2);
     }
 
     const parts =
@@ -468,13 +470,15 @@ function parsePathList(lines) {
         .filter(Boolean);
 
     let currentPath = "";
-    let parent = rootNode;
+
+    let parent = root;
 
     parts.forEach(
       (rawPart, index) => {
 
         const isLast =
-          index === parts.length - 1;
+          index ===
+          parts.length - 1;
 
         const isFolder =
           !isLast ||
@@ -482,7 +486,10 @@ function parsePathList(lines) {
 
         const part =
           sanitizeName(
-            rawPart.replace(/\/$/, "")
+            rawPart.replace(
+              /\/$/,
+              ""
+            )
           );
 
         if (!part) {
@@ -513,31 +520,36 @@ function parsePathList(lines) {
             node
           );
 
-          parent.children.push(node);
+          parent.children.push(
+            node
+          );
         }
 
         if (
           node.type === "folder"
         ) {
+
           parent = node;
         }
+
       }
     );
   }
 
   if (
-    rootNode.children.length === 1 &&
-    rootNode.children[0].type === "folder"
+    root.children.length === 1 &&
+    root.children[0].type === "folder"
   ) {
-    return rootNode.children[0];
+
+    return root.children[0];
   }
 
-  return rootNode;
+  return root;
 }
 
 
 /* ========================================================
-   ASCII TREE PARSER
+   ASCII TREE
 ======================================================== */
 
 function parseAsciiTree(lines) {
@@ -552,12 +564,12 @@ function parseAsciiTree(lines) {
             ""
           );
 
-        const nameMatch =
+        const match =
           clean.match(
             /^[\s\t│|├└+─\-]+/
           );
 
-        if (!nameMatch) {
+        if (!match) {
 
           const trimmed =
             clean.trim();
@@ -566,54 +578,68 @@ function parseAsciiTree(lines) {
             return null;
           }
 
-          const explicitFolder =
+          const folder =
             trimmed.endsWith("/");
 
           return {
+
             depth: 0,
 
             name:
               sanitizeName(
-                explicitFolder
+                folder
                   ? trimmed.slice(0, -1)
                   : trimmed
               ),
 
             isExplicitFolder:
-              explicitFolder
+              folder
           };
         }
 
         const prefix =
-          nameMatch[0];
+          match[0];
 
         let name =
           clean
-            .substring(prefix.length)
+            .substring(
+              prefix.length
+            )
             .trim();
 
         if (!name) {
           return null;
         }
 
-        const isExplicitFolder =
+        const explicitFolder =
           name.endsWith("/");
 
-        if (isExplicitFolder) {
-          name = name.slice(0, -1);
+        if (explicitFolder) {
+          name =
+            name.slice(0, -1);
         }
 
         const branchIndex =
-          prefix.search(/[├└+]/);
+          prefix.search(
+            /[├└+]/
+          );
 
         let depth = 1;
 
-        if (branchIndex >= 0) {
+        if (
+          branchIndex >= 0
+        ) {
 
           const indent =
             prefix
-              .substring(0, branchIndex)
-              .replace(/\t/g, "    ");
+              .substring(
+                0,
+                branchIndex
+              )
+              .replace(
+                /\t/g,
+                "    "
+              );
 
           depth =
             1 +
@@ -639,37 +665,48 @@ function parseAsciiTree(lines) {
         }
 
         return {
+
           depth,
 
           name:
             sanitizeName(name),
 
-          isExplicitFolder
+          isExplicitFolder:
+            explicitFolder
+
         };
 
       })
       .filter(Boolean);
 
+
   if (!parsed.length) {
     return null;
   }
 
+
   const rootLine =
     parsed[0];
 
-  const rootNode =
+
+  const root =
     createSafeNode(
-      rootLine.name || "project",
+      rootLine.name ||
+        "project",
       "folder",
       rootLine.name
     );
 
+
   const stack = [
+
     {
-      node: rootNode,
+      node: root,
       depth: rootLine.depth
     }
+
   ];
+
 
   for (
     let i = 1;
@@ -683,37 +720,47 @@ function parseAsciiTree(lines) {
     const next =
       parsed[i + 1];
 
+
     const nextIsDeeper =
       next &&
-      next.depth > current.depth;
+      next.depth >
+        current.depth;
+
 
     const hasExtension =
       current.name.includes(".") &&
       !current.name.startsWith(".");
+
 
     const isFolder =
       current.isExplicitFolder ||
       nextIsDeeper ||
       !hasExtension;
 
+
     while (
       stack.length > 1 &&
       stack[
         stack.length - 1
-      ].depth >= current.depth
+      ].depth >=
+        current.depth
     ) {
+
       stack.pop();
     }
+
 
     const parent =
       stack[
         stack.length - 1
       ].node;
 
-    const itemPath =
+
+    const path =
       parent.path
         ? `${parent.path}/${current.name}`
         : current.name;
+
 
     const node =
       createSafeNode(
@@ -721,77 +768,31 @@ function parseAsciiTree(lines) {
         isFolder
           ? "folder"
           : "file",
-        itemPath
+        path
       );
 
-    if (!parent.children) {
-      parent.children = [];
-    }
 
-    parent.children.push(node);
+    parent.children.push(
+      node
+    );
+
 
     if (isFolder) {
 
       stack.push({
-        node: node,
-        depth: current.depth
+
+        node,
+
+        depth:
+          current.depth
+
       });
     }
+
   }
 
-  return rootNode;
-}
 
-
-/* ========================================================
-   UPDATE APPLICATION
-======================================================== */
-
-function handleInputUpdate() {
-
-  const input =
-    $("rawTextInput");
-
-  if (!input) {
-    return;
-  }
-
-  const raw = input.value;
-
-  const lines =
-    raw
-      ? raw.split("\n").length
-      : 0;
-
-  $("lineCountBadge").textContent =
-    `${lines} ${
-      lines === 1
-        ? "line"
-        : "lines"
-    }`;
-
-  state.currentParsedTree =
-    parseFileStructure(raw);
-
-  state.totalFolders = 0;
-  state.totalFiles = 0;
-
-  if (
-    state.currentParsedTree
-  ) {
-
-    prepareTree(
-      state.currentParsedTree
-    );
-  }
-
-  $("folderCountPill").textContent =
-    `📁 ${state.totalFolders} folders`;
-
-  $("fileCountPill").textContent =
-    `📄 ${state.totalFiles} files`;
-
-  renderTreeDOM();
+  return root;
 }
 
 
@@ -801,7 +802,9 @@ function handleInputUpdate() {
 
 function prepareTree(node) {
 
-  if (node.type === "folder") {
+  if (
+    node.type === "folder"
+  ) {
 
     state.totalFolders++;
 
@@ -815,7 +818,9 @@ function prepareTree(node) {
     return;
   }
 
+
   state.totalFiles++;
+
 
   if (
     node.content === undefined
@@ -830,28 +835,99 @@ function prepareTree(node) {
 
 
 /* ========================================================
+   INPUT UPDATE
+======================================================== */
+
+function handleInputUpdate() {
+
+  const input =
+    $("rawTextInput");
+
+  if (!input) {
+    return;
+  }
+
+
+  const raw =
+    input.value;
+
+
+  const lines =
+    raw
+      ? raw.split("\n").length
+      : 0;
+
+
+  $("lineCountBadge")
+    .textContent =
+    `${lines} ${
+      lines === 1
+        ? "line"
+        : "lines"
+    }`;
+
+
+  state.currentParsedTree =
+    parseFileStructure(raw);
+
+
+  state.totalFolders = 0;
+
+  state.totalFiles = 0;
+
+
+  if (
+    state.currentParsedTree
+  ) {
+
+    prepareTree(
+      state.currentParsedTree
+    );
+  }
+
+
+  $("folderCountPill")
+    .textContent =
+    `📁 ${state.totalFolders} folders`;
+
+
+  $("fileCountPill")
+    .textContent =
+    `📄 ${state.totalFiles} files`;
+
+
+  renderTreeDOM();
+}
+
+
+/* ========================================================
    ESCAPE HTML
 ======================================================== */
 
 function escapeHTML(value) {
 
   return String(value)
+
     .replace(
       /&/g,
       "&amp;"
     )
+
     .replace(
       /</g,
       "&lt;"
     )
+
     .replace(
       />/g,
       "&gt;"
     )
+
     .replace(
       /"/g,
       "&quot;"
     )
+
     .replace(
       /'/g,
       "&#039;"
@@ -860,7 +936,7 @@ function escapeHTML(value) {
 
 
 /* ========================================================
-   TREE SEARCH
+   SEARCH
 ======================================================== */
 
 function nodeMatchesSearch(
@@ -872,13 +948,16 @@ function nodeMatchesSearch(
     return true;
   }
 
+
   if (
     node.name
       .toLowerCase()
       .includes(query)
   ) {
+
     return true;
   }
+
 
   if (
     node.type === "folder" &&
@@ -894,12 +973,13 @@ function nodeMatchesSearch(
     );
   }
 
+
   return false;
 }
 
 
 /* ========================================================
-   TREE RENDER
+   RENDER TREE
 ======================================================== */
 
 function renderTreeDOM() {
@@ -911,8 +991,10 @@ function renderTreeDOM() {
     return;
   }
 
+
   const search =
     $("searchInput");
+
 
   const query =
     search
@@ -921,20 +1003,27 @@ function renderTreeDOM() {
           .trim()
       : "";
 
+
   if (
     !state.currentParsedTree
   ) {
 
     container.innerHTML = `
+
       <div class="tree-empty">
-        <div style="font-size:40px">
+
+        <div
+          style="font-size:40px"
+        >
           📁
         </div>
 
         <p>
           No folder structure parsed yet.
         </p>
+
       </div>
+
     `;
 
     return;
@@ -949,18 +1038,23 @@ function renderTreeDOM() {
         query
       )
     ) {
+
       return "";
     }
 
+
     const isFolder =
       node.type === "folder";
+
 
     const icon =
       isFolder
         ? "📁"
         : "📄";
 
+
     let childrenHTML = "";
+
 
     if (
       isFolder &&
@@ -969,32 +1063,51 @@ function renderTreeDOM() {
     ) {
 
       childrenHTML = `
+
         <div class="tree-children">
+
           ${node.children
-            .map(buildNodeHTML)
+            .map(
+              buildNodeHTML
+            )
             .join("")}
+
         </div>
+
       `;
     }
 
+
     const safeName =
-      escapeHTML(node.name);
+      escapeHTML(
+        node.name
+      );
+
 
     const safeId =
-      escapeHTML(node.id);
+      escapeHTML(
+        node.id
+      );
+
 
     const itemCount =
       node.children
         ? node.children.length
         : 0;
 
+
     return `
+
       <div class="tree-node">
 
         <div
           class="tree-row"
           data-node-id="${safeId}"
-          data-node-type="${isFolder ? "folder" : "file"}"
+          data-node-type="${
+            isFolder
+              ? "folder"
+              : "file"
+          }"
         >
 
           <div
@@ -1007,7 +1120,11 @@ function renderTreeDOM() {
           >
 
             <span>
-              ${isFolder ? "▼" : ""}
+              ${
+                isFolder
+                  ? "▼"
+                  : ""
+              }
             </span>
 
             <span>
@@ -1026,12 +1143,14 @@ function renderTreeDOM() {
 
           </div>
 
+
           <div>
 
             ${
               isFolder
 
                 ? `
+
                   <span
                     style="
                       color:#64748b;
@@ -1040,9 +1159,11 @@ function renderTreeDOM() {
                   >
                     ${itemCount} items
                   </span>
+
                 `
 
                 : `
+
                   <button
                     class="inspect-btn"
                     data-node-id="${safeId}"
@@ -1050,6 +1171,7 @@ function renderTreeDOM() {
                   >
                     Edit
                   </button>
+
                 `
             }
 
@@ -1057,11 +1179,14 @@ function renderTreeDOM() {
 
         </div>
 
+
         ${childrenHTML}
 
       </div>
+
     `;
   }
+
 
   container.innerHTML =
     buildNodeHTML(
@@ -1071,209 +1196,338 @@ function renderTreeDOM() {
 
 
 /* ========================================================
-   ZIP LIBRARY LOADER
+   DEBUG JSZIP
 ======================================================== */
 
-/*
- * This is the important fix.
- *
- * JSZip should be available as window.JSZip.
- * If it is not available, try loading the local
- * library again.
- */
+function debugJSZip() {
 
-function isJSZipReady() {
-
-  return (
-    typeof window.JSZip === "function"
+  console.log(
+    "================================"
   );
-}
+
+  console.log(
+    "FILE STRUCTURE BUILDER ZIP DEBUG"
+  );
+
+  console.log(
+    "================================"
+  );
 
 
-function loadJSZip() {
-
-  return new Promise(
-    (resolve, reject) => {
-
-      // Already loaded
-      if (isJSZipReady()) {
-        resolve(window.JSZip);
-        return;
-      }
-
-      // Look for an existing script
-      const existingScript =
-        document.querySelector(
-          'script[src*="jszip.min.js"]'
-        );
-
-      if (existingScript) {
-
-        existingScript.addEventListener(
-          "load",
-          () => {
-
-            if (isJSZipReady()) {
-              resolve(window.JSZip);
-            } else {
-              reject(
-                new Error(
-                  "JSZip loaded but window.JSZip was not created."
-                )
-              );
-            }
-
-          },
-          { once: true }
-        );
-
-        existingScript.addEventListener(
-          "error",
-          () => {
-
-            reject(
-              new Error(
-                "Unable to load JSZip library."
-              )
-            );
-
-          },
-          { once: true }
-        );
-
-        // Check again shortly in case it loaded
-        const checkInterval =
-          setInterval(
-            () => {
-
-              if (isJSZipReady()) {
-
-                clearInterval(
-                  checkInterval
-                );
-
-                resolve(
-                  window.JSZip
-                );
-              }
-
-            },
-            50
-          );
-
-        setTimeout(
-          () => {
-
-            clearInterval(
-              checkInterval
-            );
-
-            if (!isJSZipReady()) {
-
-              reject(
-                new Error(
-                  "JSZip did not become available."
-                )
-              );
-            }
-
-          },
-          5000
-        );
-
-        return;
-      }
+  console.log(
+    "Current page:",
+    window.location.href
+  );
 
 
-      // No existing script found.
-      // Create one dynamically.
+  console.log(
+    "JSZip object:",
+    window.JSZip
+  );
 
-      const script =
-        document.createElement("script");
 
-      script.src =
-        "./lib/jszip.min.js?v=2";
+  console.log(
+    "JSZip type:",
+    typeof window.JSZip
+  );
 
-      script.async = false;
 
-      script.onload = () => {
+  console.log(
+    "JSZip version:",
+    window.JSZip
+      ? window.JSZip.version
+      : "NOT AVAILABLE"
+  );
 
-        if (isJSZipReady()) {
 
-          resolve(
-            window.JSZip
-          );
+  const jszipURL =
+    new URL(
+      "./lib/jszip.min.js",
+      window.location.href
+    ).href;
 
-        } else {
 
-          reject(
-            new Error(
-              "JSZip loaded but is unavailable."
-            )
-          );
-        }
-      };
+  console.log(
+    "Expected JSZip URL:",
+    jszipURL
+  );
 
-      script.onerror = () => {
 
-        reject(
-          new Error(
-            "Could not load ./lib/jszip.min.js"
-          )
-        );
-      };
+  const scripts =
+    Array.from(
+      document.scripts
+    );
 
-      document.head.appendChild(
-        script
+
+  console.log(
+    "Loaded scripts:"
+  );
+
+
+  scripts.forEach(
+    script => {
+
+      console.log(
+        script.src
       );
 
     }
   );
+
+
+  console.log(
+    "================================"
+  );
 }
 
 
 /* ========================================================
-   TRIGGER DOWNLOAD
+   ZIP DOWNLOAD - TEMPORARY DEBUG
 ======================================================== */
 
-function triggerDownload(
-  blob,
-  filename
-) {
+async function handleDownloadZip() {
 
-  const url =
-    URL.createObjectURL(blob);
+  /*
+   * STEP 1
+   * Show JSZip information.
+   */
 
-  const link =
-    document.createElement("a");
+  debugJSZip();
 
-  link.href = url;
-  link.download = filename;
-  link.style.display = "none";
 
-  document.body.appendChild(
-    link
+  /*
+   * STEP 2
+   * Check JSZip.
+   */
+
+  if (
+    typeof window.JSZip !==
+    "function"
+  ) {
+
+    alert(
+
+      "❌ JSZip NOT LOADED\n\n" +
+
+      "Type: " +
+      typeof window.JSZip +
+
+      "\n\nExpected file:\n" +
+
+      new URL(
+        "./lib/jszip.min.js",
+        window.location.href
+      ).href +
+
+      "\n\n" +
+
+      "Open browser Console (F12) " +
+      "and check the JSZip debug information."
+
+    );
+
+    return;
+  }
+
+
+  /*
+   * STEP 3
+   * JSZip loaded.
+   */
+
+  alert(
+
+    "✅ JSZip IS LOADED\n\n" +
+
+    "Version: " +
+
+    (
+      window.JSZip.version ||
+      "Unknown"
+    ) +
+
+    "\n\n" +
+
+    "Now ZIP generation will start."
+
   );
 
-  link.click();
 
-  setTimeout(
-    () => {
+  /*
+   * STEP 4
+   * Parse input if needed.
+   */
 
-      link.remove();
+  if (
+    !state.currentParsedTree
+  ) {
 
-      URL.revokeObjectURL(
-        url
+    handleInputUpdate();
+  }
+
+
+  /*
+   * STEP 5
+   * Check structure.
+   */
+
+  if (
+    !state.currentParsedTree
+  ) {
+
+    alert(
+      "Please enter a folder structure first."
+    );
+
+    return;
+  }
+
+
+  /*
+   * STEP 6
+   * Create ZIP.
+   */
+
+  try {
+
+    console.log(
+      "Creating JSZip instance..."
+    );
+
+
+    const zip =
+      new window.JSZip();
+
+
+    console.log(
+      "JSZip instance:",
+      zip
+    );
+
+
+    /*
+     * Root folder.
+     */
+
+    const rootName =
+      sanitizeName(
+        state.currentParsedTree.name
+      ) ||
+      "project";
+
+
+    console.log(
+      "Root name:",
+      rootName
+    );
+
+
+    const rootZip =
+      zip.folder(
+        rootName
       );
 
-    },
-    1000
-  );
+
+    /*
+     * Add children.
+     */
+
+    if (
+      state.currentParsedTree.children
+    ) {
+
+      state.currentParsedTree.children
+        .forEach(
+          child => {
+
+            addNodeToZip(
+              child,
+              rootZip
+            );
+
+          }
+        );
+    }
+
+
+    console.log(
+      "Generating ZIP..."
+    );
+
+
+    /*
+     * Generate ZIP.
+     */
+
+    const blob =
+      await zip.generateAsync({
+
+        type: "blob",
+
+        compression:
+          "DEFLATE",
+
+        compressionOptions: {
+          level: 6
+        }
+
+      });
+
+
+    console.log(
+      "ZIP generated:",
+      blob
+    );
+
+
+    /*
+     * Download.
+     */
+
+    triggerDownload(
+      blob,
+      `${rootName}.zip`
+    );
+
+
+    showToast(
+      `✅ Generated ${rootName}.zip`,
+      "success"
+    );
+
+
+    console.log(
+      "ZIP DOWNLOAD SUCCESS"
+    );
+
+  } catch (error) {
+
+    console.error(
+      "ZIP GENERATION ERROR:",
+      error
+    );
+
+
+    alert(
+
+      "❌ ZIP GENERATION FAILED\n\n" +
+
+      error.message
+
+    );
+
+
+    showToast(
+      "ZIP generation failed: " +
+      error.message,
+      "error"
+    );
+  }
 }
 
 
 /* ========================================================
-   ADD TREE TO ZIP
+   ADD NODE TO ZIP
 ======================================================== */
 
 function addNodeToZip(
@@ -1285,6 +1539,7 @@ function addNodeToZip(
     sanitizeName(
       node.name
     );
+
 
   if (!cleanName) {
     return;
@@ -1299,6 +1554,7 @@ function addNodeToZip(
       folderZip.folder(
         cleanName
       );
+
 
     if (
       node.children
@@ -1316,6 +1572,7 @@ function addNodeToZip(
       );
     }
 
+
     return;
   }
 
@@ -1328,256 +1585,105 @@ function addNodeToZip(
 
 
 /* ========================================================
-   DOWNLOAD ZIP
+   TRIGGER DOWNLOAD
 ======================================================== */
 
-async function handleDownloadZip() {
+function triggerDownload(
+  blob,
+  filename
+) {
 
-  try {
-
-    /*
-     * Make sure tree exists
-     */
-
-    if (
-      !state.currentParsedTree
-    ) {
-
-      const raw =
-        $("rawTextInput").value;
-
-      if (
-        raw &&
-        raw.trim()
-      ) {
-
-        handleInputUpdate();
-      }
-    }
+  console.log(
+    "Preparing browser download..."
+  );
 
 
-    /*
-     * Stop if no structure
-     */
-
-    if (
-      !state.currentParsedTree
-    ) {
-
-      showToast(
-        "Please enter a folder structure first.",
-        "error"
-      );
-
-      return;
-    }
-
-
-    /*
-     * Make absolutely sure JSZip exists
-     */
-
-    if (
-      !isJSZipReady()
-    ) {
-
-      showToast(
-        "Loading ZIP library...",
-        "info"
-      );
-
-      try {
-
-        await loadJSZip();
-
-      } catch (libraryError) {
-
-        console.error(
-          "JSZip loading error:",
-          libraryError
-        );
-
-        showToast(
-          "ZIP library failed to load. Please refresh the page.",
-          "error"
-        );
-
-        return;
-      }
-    }
-
-
-    /*
-     * Final safety check
-     */
-
-    if (
-      typeof window.JSZip !== "function"
-    ) {
-
-      console.error(
-        "JSZip unavailable:",
-        window.JSZip
-      );
-
-      showToast(
-        "ZIP library is unavailable.",
-        "error"
-      );
-
-      return;
-    }
-
-
-    /*
-     * Start generation
-     */
-
-    showToast(
-      "Generating ZIP package...",
-      "info"
+  const url =
+    URL.createObjectURL(
+      blob
     );
 
 
-    /*
-     * IMPORTANT:
-     * Use window.JSZip
-     */
-
-    const zip =
-      new window.JSZip();
+  const link =
+    document.createElement(
+      "a"
+    );
 
 
-    /*
-     * Root folder
-     */
+  link.href = url;
 
-    const rootName =
-      sanitizeName(
-        state.currentParsedTree.name
-      ) || "project";
+  link.download =
+    filename;
+
+  link.style.display =
+    "none";
 
 
-    const rootZip =
-      zip.folder(
-        rootName
+  document.body.appendChild(
+    link
+  );
+
+
+  link.click();
+
+
+  setTimeout(
+    () => {
+
+      link.remove();
+
+      URL.revokeObjectURL(
+        url
       );
 
-
-    /*
-     * Add children
-     */
-
-    if (
-      state.currentParsedTree.children
-    ) {
-
-      state.currentParsedTree.children.forEach(
-        child => {
-
-          addNodeToZip(
-            child,
-            rootZip
-          );
-
-        }
-      );
-    }
-
-
-    /*
-     * Generate ZIP
-     */
-
-    const blob =
-      await zip.generateAsync({
-
-        type: "blob",
-
-        compression: "DEFLATE",
-
-        compressionOptions: {
-          level: 6
-        }
-
-      });
-
-
-    /*
-     * Download
-     */
-
-    triggerDownload(
-      blob,
-      `${rootName}.zip`
-    );
-
-
-    /*
-     * Success
-     */
-
-    showToast(
-      `✅ Generated ${rootName}.zip`,
-      "success"
-    );
-
-
-    state.activeInspectorNode =
-      null;
-
-  } catch (error) {
-
-    console.error(
-      "ZIP generation error:",
-      error
-    );
-
-    showToast(
-      "Unable to generate ZIP: " +
-      (
-        error &&
-        error.message
-          ? error.message
-          : "Unknown error"
-      ),
-      "error"
-    );
-  }
+    },
+    1000
+  );
 }
 
 
 /* ========================================================
-   CLEAR INPUT / RESET
+   CLEAR
 ======================================================== */
 
 function purgeMemoryAndInput() {
 
-  $("rawTextInput").value = "";
+  $("rawTextInput").value =
+    "";
 
   state.currentParsedTree =
     null;
 
   state.nodeIndexMap.clear();
 
-  state.nodeCounter = 0;
+  state.nodeCounter =
+    0;
 
-  state.totalFolders = 0;
+  state.totalFolders =
+    0;
 
-  state.totalFiles = 0;
+  state.totalFiles =
+    0;
 
   state.activeInspectorNode =
     null;
 
+
   renderTreeDOM();
 
-  $("lineCountBadge").textContent =
+
+  $("lineCountBadge")
+    .textContent =
     "0 lines";
 
-  $("folderCountPill").textContent =
+
+  $("folderCountPill")
+    .textContent =
     "📁 0 folders";
 
-  $("fileCountPill").textContent =
+
+  $("fileCountPill")
+    .textContent =
     "📄 0 files";
 }
 
@@ -1597,12 +1703,14 @@ function showToast(
   const content =
     $("statusToastContent");
 
+
   if (
     !toast ||
     !content
   ) {
     return;
   }
+
 
   toast.classList.remove(
     "hidden",
@@ -1611,9 +1719,11 @@ function showToast(
     "error"
   );
 
+
   toast.classList.add(
     type
   );
+
 
   content.textContent =
     message;
@@ -1624,31 +1734,37 @@ function showToast(
    FILE INSPECTOR
 ======================================================== */
 
-function openInspectorNode(
-  id
-) {
+function openInspectorNode(id) {
 
   const node =
-    state.nodeIndexMap.get(id);
+    state.nodeIndexMap.get(
+      id
+    );
+
 
   if (!node) {
     return;
   }
 
+
   state.activeInspectorNode =
     node;
+
 
   $("modalFileName")
     .textContent =
     node.name;
 
+
   $("modalFilePath")
     .textContent =
     node.path;
 
+
   $("modalFileContent")
     .value =
     node.content || "";
+
 
   $("fileInspectorModal")
     .classList.remove(
@@ -1664,6 +1780,7 @@ function closeInspector() {
       "hidden"
     );
 
+
   state.activeInspectorNode =
     null;
 }
@@ -1678,6 +1795,7 @@ async function copyInput() {
   const text =
     $("rawTextInput").value;
 
+
   if (!text) {
 
     showToast(
@@ -1688,15 +1806,19 @@ async function copyInput() {
     return;
   }
 
+
   try {
 
-    await navigator.clipboard.writeText(
-      text
-    );
+    await navigator.clipboard
+      .writeText(
+        text
+      );
+
 
     $("copyBtnLabel")
       .textContent =
       "Copied";
+
 
     setTimeout(
       () => {
@@ -1709,6 +1831,7 @@ async function copyInput() {
       1500
     );
 
+
   } catch (error) {
 
     showToast(
@@ -1720,14 +1843,15 @@ async function copyInput() {
 
 
 /* ========================================================
-   INITIALIZE APPLICATION
+   INITIALIZE
 ======================================================== */
 
 function initializeApp() {
 
-  /* -------------------------------------------------------
-     Input
-  ------------------------------------------------------- */
+
+  /*
+   * Input
+   */
 
   $("rawTextInput")
     .addEventListener(
@@ -1736,9 +1860,9 @@ function initializeApp() {
     );
 
 
-  /* -------------------------------------------------------
-     Search
-  ------------------------------------------------------- */
+  /*
+   * Search
+   */
 
   $("searchInput")
     .addEventListener(
@@ -1747,9 +1871,9 @@ function initializeApp() {
     );
 
 
-  /* -------------------------------------------------------
-     Preset menu
-  ------------------------------------------------------- */
+  /*
+   * Preset menu
+   */
 
   $("presetToggleBtn")
     .addEventListener(
@@ -1762,6 +1886,7 @@ function initializeApp() {
           .classList.toggle(
             "hidden"
           );
+
       }
     );
 
@@ -1779,9 +1904,9 @@ function initializeApp() {
   );
 
 
-  /* -------------------------------------------------------
-     Presets
-  ------------------------------------------------------- */
+  /*
+   * Presets
+   */
 
   document
     .querySelectorAll(
@@ -1796,8 +1921,10 @@ function initializeApp() {
 
             event.stopPropagation();
 
+
             const preset =
               button.dataset.preset;
+
 
             if (
               !TEMPLATES[preset]
@@ -1805,25 +1932,30 @@ function initializeApp() {
               return;
             }
 
+
             $("rawTextInput")
               .value =
               TEMPLATES[preset];
+
 
             $("presetMenu")
               .classList.add(
                 "hidden"
               );
 
+
             handleInputUpdate();
+
           }
         );
+
       }
     );
 
 
-  /* -------------------------------------------------------
-     Copy
-  ------------------------------------------------------- */
+  /*
+   * Copy
+   */
 
   $("copyInputBtn")
     .addEventListener(
@@ -1832,9 +1964,9 @@ function initializeApp() {
     );
 
 
-  /* -------------------------------------------------------
-     Clear
-  ------------------------------------------------------- */
+  /*
+   * Clear
+   */
 
   $("clearInputBtn")
     .addEventListener(
@@ -1843,9 +1975,9 @@ function initializeApp() {
     );
 
 
-  /* -------------------------------------------------------
-     Download ZIP
-  ------------------------------------------------------- */
+  /*
+   * DOWNLOAD
+   */
 
   $("downloadZipBtn")
     .addEventListener(
@@ -1854,9 +1986,9 @@ function initializeApp() {
     );
 
 
-  /* -------------------------------------------------------
-     Tree clicks
-  ------------------------------------------------------- */
+  /*
+   * Tree
+   */
 
   $("treeContainer")
     .addEventListener(
@@ -1868,15 +2000,18 @@ function initializeApp() {
             ".inspect-btn"
           );
 
+
         if (
           inspectButton
         ) {
 
           event.stopPropagation();
 
+
           openInspectorNode(
             inspectButton.dataset.nodeId
           );
+
 
           return;
         }
@@ -1886,6 +2021,7 @@ function initializeApp() {
           event.target.closest(
             ".tree-row"
           );
+
 
         if (!row) {
           return;
@@ -1901,13 +2037,14 @@ function initializeApp() {
             row.dataset.nodeId
           );
         }
+
       }
     );
 
 
-  /* -------------------------------------------------------
-     Close inspector
-  ------------------------------------------------------- */
+  /*
+   * Close inspector
+   */
 
   $("closeInspectorBtn")
     .addEventListener(
@@ -1928,13 +2065,14 @@ function initializeApp() {
 
           closeInspector();
         }
+
       }
     );
 
 
-  /* -------------------------------------------------------
-     Save file content
-  ------------------------------------------------------- */
+  /*
+   * Save inspector
+   */
 
   $("saveInspectorBtn")
     .addEventListener(
@@ -1945,24 +2083,28 @@ function initializeApp() {
           state.activeInspectorNode
         ) {
 
-          state.activeInspectorNode.content =
+          state.activeInspectorNode
+            .content =
             $("modalFileContent")
               .value;
         }
 
+
         closeInspector();
+
 
         showToast(
           "File changes saved.",
           "success"
         );
+
       }
     );
 
 
-  /* -------------------------------------------------------
-     Reset boilerplate
-  ------------------------------------------------------- */
+  /*
+   * Reset boilerplate
+   */
 
   $("resetModalBoilerplateBtn")
     .addEventListener(
@@ -1976,16 +2118,18 @@ function initializeApp() {
           $("modalFileContent")
             .value =
             getBoilerplateContent(
-              state.activeInspectorNode.name
+              state.activeInspectorNode
+                .name
             );
         }
+
       }
     );
 
 
-  /* -------------------------------------------------------
-     Close toast
-  ------------------------------------------------------- */
+  /*
+   * Close toast
+   */
 
   $("closeToastBtn")
     .addEventListener(
@@ -1996,13 +2140,14 @@ function initializeApp() {
           .classList.add(
             "hidden"
           );
+
       }
     );
 
 
-  /* -------------------------------------------------------
-     ESC key
-  ------------------------------------------------------- */
+  /*
+   * ESC
+   */
 
   document.addEventListener(
     "keydown",
@@ -2019,44 +2164,63 @@ function initializeApp() {
             "hidden"
           );
       }
+
     }
   );
 
 
-  /* -------------------------------------------------------
-     Default template
-  ------------------------------------------------------- */
+  /*
+   * Default template
+   */
 
   $("rawTextInput")
     .value =
-    TEMPLATES["react-vite"];
+    TEMPLATES[
+      "react-vite"
+    ];
+
 
   handleInputUpdate();
 
 
-  /* -------------------------------------------------------
-     Pre-check JSZip
-  ------------------------------------------------------- */
+  /*
+   * IMPORTANT DEBUG
+   */
 
-  if (isJSZipReady()) {
+  console.log(
+    "================================"
+  );
 
-    console.log(
-      "JSZip loaded successfully.",
-      window.JSZip.version || ""
-    );
+  console.log(
+    "APP STARTED"
+  );
 
-  } else {
+  console.log(
+    "window.JSZip =",
+    window.JSZip
+  );
 
-    console.warn(
-      "JSZip is not available at initialization. " +
-      "It will be loaded when Download ZIP is clicked."
-    );
-  }
+  console.log(
+    "typeof window.JSZip =",
+    typeof window.JSZip
+  );
+
+  console.log(
+    "JSZip URL =",
+    new URL(
+      "./lib/jszip.min.js",
+      window.location.href
+    ).href
+  );
+
+  console.log(
+    "================================"
+  );
 }
 
 
 /* ========================================================
-   START APPLICATION
+   START
 ======================================================== */
 
 if (
